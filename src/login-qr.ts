@@ -4,58 +4,42 @@
  *
  * 适用于 VPS / 无 UI 容器环境
  */
-import sharp from "sharp";
-import jsQR from "jsqr";
 import QRCode from "qrcode-terminal";
-
-const MCP_BASE = (process.env.XHS_MCP_URL || "http://localhost:18060").replace(/\/mcp$/, "");
-
-async function fetchQrcode(): Promise<{ isLoggedIn: boolean; img?: string; timeout?: string }> {
-  const res = await fetch(`${MCP_BASE}/api/v1/login/qrcode`);
-  if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-  const json = (await res.json()) as { success: boolean; data: { is_logged_in: boolean; img?: string; timeout?: string } };
-  return {
-    isLoggedIn: json.data.is_logged_in,
-    img: json.data.img,
-    timeout: json.data.timeout,
-  };
-}
-
-
-async function decodeQrFromBase64(dataUrl: string): Promise<string | null> {
-  // Strip "data:image/png;base64," prefix if present
-  const base64 = dataUrl.includes(",") ? dataUrl.split(",")[1] : dataUrl;
-  const buf = Buffer.from(base64, "base64");
-  const { data, info } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  const code = jsQR(new Uint8ClampedArray(data), info.width, info.height);
-  return code?.data ?? null;
-}
+import { callMcp } from "./publish";
 
 async function main() {
   console.log("🔍 检查登录状态...");
 
-  const { isLoggedIn, img, timeout } = await fetchQrcode();
+  const statusRes = await callMcp("check_login_status", {});
+  const statusText = statusRes.result?.content?.[0]?.text || "";
+  const isLoggedIn =
+    statusText.includes("已登录") || statusText.includes("登录状态") ||
+    statusText.includes("处于登录") || statusText.includes("logged in");
 
   if (isLoggedIn) {
     console.log("✅ 已登录小红书，无需扫码");
+    console.log("   " + statusText.split("\n")[0]);
     return;
   }
 
-  if (!img) {
-    console.error("❌ 服务器未返回二维码，请确认 xiaohongshu-mcp 正在运行");
-    process.exit(1);
+  console.log("❌ 未登录，正在获取二维码...\n");
+
+  const qrRes = await callMcp("get_login_qrcode", {});
+  const qrText = qrRes.result?.content?.[0]?.text || "";
+
+  // 提取二维码 URL（MCP 返回的文本里通常包含 URL）
+  const urlMatch = qrText.match(/https?:\/\/[^\s\n"']+/);
+  if (!urlMatch) {
+    console.log("MCP 返回内容:");
+    console.log(qrText);
+    return;
   }
 
-  const qrData = await decodeQrFromBase64(img);
-  if (!qrData) {
-    console.error("❌ 无法解码二维码图片，请检查图片格式");
-    process.exit(1);
-  }
-
-  console.log("\n📱 请用小红书 App 或微信扫描以下二维码登录:\n");
-  QRCode.generate(qrData, { small: true });
-  if (timeout) console.log(`\n⏱  有效期: ${timeout}`);
-  console.log("\n扫码后请关闭浏览器窗口，登录完成。");
+  const qrUrl = urlMatch[0];
+  console.log("📱 请用小红书 App 扫描以下二维码登录:\n");
+  QRCode.generate(qrUrl, { small: true });
+  console.log("\n二维码 URL:", qrUrl);
+  console.log("\n扫码后等待几秒，再次运行此脚本确认登录状态。");
 }
 
 main()
