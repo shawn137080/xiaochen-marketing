@@ -202,7 +202,7 @@ ${userEditsCtx}
    - 必须包含兜兜AI真实功能（短信通知/一键确认/日历接入），不要编造没有的功能
    - industry: renovation | hvac | beauty | moving | landscaping | tutoring | general 其中之一
    - contentAngle: pain_point | tool_review | case_study | data | comparison 其中之一
-   - tags: 3-5 个标签
+   - tags: 8-10 个标签（小红书最多支持10个，尽量填满）
 
 ### 输出格式（严格 JSON，不要其他文字）
 {
