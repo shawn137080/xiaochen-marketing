@@ -139,6 +139,7 @@
 
 <div class="tabs">
   <div class="tab active" data-tab="schedule">排期管理</div>
+  <div class="tab" data-tab="drafts">草稿审批 <span id="draft-badge" style="display:none;background:#f0a500;color:#000;border-radius:10px;padding:1px 7px;font-size:12px;font-weight:bold;margin-left:4px"></span></div>
   <div class="tab" data-tab="analytics">数据分析</div>
   <div class="tab" data-tab="evolution">进化记录</div>
   <div class="tab" data-tab="reports">周报/月报</div>
@@ -313,6 +314,7 @@ function render() {
   const el = $('#content');
   switch (currentTab) {
     case 'schedule': el.innerHTML = renderSchedule(); break;
+    case 'drafts': renderDrafts(el); break;
     case 'analytics': el.innerHTML = renderAnalytics(); break;
     case 'evolution': el.innerHTML = renderEvolution(); break;
     case 'reports': el.innerHTML = renderReports(); break;
@@ -454,9 +456,83 @@ function renderReports() {
   return html;
 }
 
+// ── 草稿审批 ──────────────────────────────────────────────────────────────
+
+async function loadDraftBadge() {
+  try {
+    const drafts = await fetch('/api/drafts').then(r => r.json());
+    const badge = document.getElementById('draft-badge');
+    if (badge) {
+      if (drafts.length > 0) { badge.textContent = drafts.length; badge.style.display = 'inline'; }
+      else { badge.style.display = 'none'; }
+    }
+  } catch {}
+}
+
+async function renderDrafts(el) {
+  el.innerHTML = '<div style="padding:40px;color:#737373">加载中...</div>';
+  const drafts = await fetch('/api/drafts').then(r => r.json());
+  if (drafts.length === 0) {
+    el.innerHTML = '<div class="empty">✅ 暂无待审批草稿<br><br>小陈会在每周一、三、五 02:00 自动生成新选题，你也可以手动运行 <code>npx tsx src/discover.ts</code> 立即生成</div>';
+    return;
+  }
+  el.innerHTML = drafts.map(d => `
+    <div id="draft-${d.id}" style="background:#1c1c1c;border:1px solid #f0a500;border-radius:12px;padding:20px;margin-bottom:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <span style="font-size:12px;color:#737373">${new Date(d.createdAt).toLocaleString('zh-CN')} · ${d.industry||'general'} · ${d.contentAngle||''}</span>
+        <span style="font-size:12px;color:#f0a500;background:#2a2400;padding:2px 8px;border-radius:4px">AI 草稿</span>
+      </div>
+      <input id="draft-title-${d.id}" value="${escHtml(d.title)}"
+        style="width:100%;background:#111;color:#fff;border:1px solid #333;border-radius:6px;padding:8px 12px;font-size:16px;font-weight:bold;margin-bottom:10px">
+      <textarea id="draft-content-${d.id}" rows="10"
+        style="width:100%;background:#111;color:#e5e5e5;border:1px solid #333;border-radius:6px;padding:10px 12px;font-size:14px;line-height:1.7;resize:vertical">${escHtml(d.content)}</textarea>
+      <div style="display:flex;gap:10px;margin-top:12px">
+        <button onclick="approveDraft('${d.id}')"
+          style="background:#1a7f37;color:#fff;border:none;border-radius:6px;padding:10px 24px;cursor:pointer;font-size:14px;font-weight:600">
+          ✅ 确认排期
+        </button>
+        <button onclick="discardDraft('${d.id}')"
+          style="background:#6e1111;color:#fff;border:none;border-radius:6px;padding:10px 16px;cursor:pointer;font-size:14px">
+          🗑 丢弃
+        </button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function approveDraft(id) {
+  const title = document.getElementById('draft-title-' + id).value;
+  const content = document.getElementById('draft-content-' + id).value;
+  const res = await fetch('/api/notes/' + id + '/approve', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, content }),
+  });
+  if (res.ok) {
+    document.getElementById('draft-' + id).remove();
+    loadDraftBadge();
+    const el = $('#content');
+    const remaining = el.querySelectorAll('[id^="draft-"]');
+    if (remaining.length === 0) el.innerHTML = '<div class="empty">✅ 全部审批完成！笔记已排期，daemon 会自动发布。</div>';
+  }
+}
+
+async function discardDraft(id) {
+  if (!confirm('确定丢弃这篇草稿吗？')) return;
+  await fetch('/api/notes/' + id, { method: 'DELETE' });
+  document.getElementById('draft-' + id).remove();
+  loadDraftBadge();
+}
+
+function escHtml(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 // Auto-refresh every 30s
 fetchAll();
+loadDraftBadge();
 setInterval(fetchAll, 30000);
+setInterval(loadDraftBadge, 5 * 60 * 1000);
 </script>
 </body>
 </html>
