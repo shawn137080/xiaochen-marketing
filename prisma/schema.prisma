@@ -21,6 +21,9 @@ model XhsNote {
   status       String   @default("draft") // draft | scheduled | published | archived
   scheduledAt  DateTime?
   publishedAt  DateTime?
+  aiDraft      String?   // AI 原始生成版本（用户确认后不变）
+  userEdits    String?   // JSON: {titleChanged, contentChanged, summary}
+  approvedAt   DateTime? // 用户点确认排期的时间
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -64,6 +67,24 @@ model XhsCompetitorNote {
   analysis         String? // 小陈的分析结论
   reusableElements String? // 可复制元素
   fetchedAt        DateTime @default(now())
+}
+
+// 竞品爆款存档（discover.ts 抓取）
+model XhsInsight {
+  id        String   @id @default(cuid())
+  keyword   String   // 搜索词
+  xhsNoteId String   // 原帖 ID
+  title     String
+  likes     Int      @default(0)
+  summary   String?  // LLM 提取的亮点摘要
+  createdAt DateTime @default(now())
+}
+
+// 系统 key-value 配置（如行业轮换游标）
+model XhsConfig {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }
 
 // 周报/月报
