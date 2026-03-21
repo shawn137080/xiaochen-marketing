@@ -28,6 +28,21 @@ const REPLACEMENTS: Replacement[] = [
   { pattern: /最\s*牛/g,           replacement: "超好用",          reason: "极限词" },
   { pattern: /第一名/g,            replacement: "口碑很好",        reason: "极限词" },
 
+  // ── 产品功能准确性 ──────────────────────────────────────────
+  // AllDayAnswer 实际功能：
+  //   ✅ 老板30秒内收到短信通知（需求摘要）
+  //   ✅ 客户马上收到确认短信
+  //   ✅ 老板一键确认工单 或 直接回拨客户
+  //   ✅ 可接入老板日历（Google Calendar 等）
+  //   ✅ 可接入客户预约/管理系统（Calendly 等）
+  //   ❌ 不支持微信通知（只支持短信/邮件）
+
+  // 不支持的通知渠道
+  { pattern: /发到.*?微信[。，]?/g,  replacement: "短信通知。", reason: "不支持微信通知" },
+  { pattern: /发.*?微信/g,           replacement: "发短信",     reason: "不支持微信通知" },
+  { pattern: /微信通知/g,            replacement: "短信通知",   reason: "不支持微信通知" },
+  { pattern: /微信提醒/g,            replacement: "短信提醒",   reason: "不支持微信通知" },
+
   // 金融/收益相关敏感词
   { pattern: /月入\s*\d+/g,        replacement: (m) => m.replace("月入", "月多赚"), reason: "收益承诺" },
   { pattern: /躺赚/g,              replacement: "省心赚钱",        reason: "被动收益暗示" },

@@ -1,8 +1,5 @@
-node_modules/
+node_modules
+# Keep environment variables out of version control
 .env
-xhs.db
-images/
-mascots/
-src/generated/
-*.log
-.DS_Store
+
+/src/generated/prisma
