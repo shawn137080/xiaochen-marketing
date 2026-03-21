@@ -143,10 +143,6 @@
       <div class="dot checking" id="xhsDot"></div>
       <span style="font-size:12px;color:#737373" id="xhsStatus">小红书...</span>
     </div>
-    <div class="status-item" style="border-left:1px solid #222;padding-left:16px;margin-left:4px">
-      <span style="font-size:11px;color:#525252">下次检查</span>
-      <span style="font-size:12px;color:#a3a3a3;font-variant-numeric:tabular-nums" id="nextCheckTime">—</span>
-    </div>
   </div>
 </div>
 
@@ -241,7 +237,10 @@ function openNote(id) {
 
       ${note.status === 'scheduled' ? `
       <div class="edit-field">
-        <div class="edit-label">📅 发布时间</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <div class="edit-label" style="margin:0">📅 发布时间</div>
+          <span style="font-size:11px;color:#525252">下次检查 <span id="modal-next-check" style="color:#a3a3a3;font-variant-numeric:tabular-nums">—</span></span>
+        </div>
         <input class="edit-input" id="edit-scheduled-at" type="datetime-local"
           style="cursor:pointer;color-scheme:dark"
           value="${note.scheduledAt ? toLocalDatetimeInput(note.scheduledAt) : ''}">
@@ -600,13 +599,17 @@ async function fetchDaemonStatus() {
   } catch { /* ignore */ }
 }
 function updateNextCheckDisplay() {
-  const el = $('#nextCheckTime');
-  if (!el) return;
-  if (!nextCheckTs) { el.textContent = '—'; return; }
-  const diff = Math.max(0, nextCheckTs - Date.now());
-  const mins = Math.floor(diff / 60000);
-  const secs = Math.floor((diff % 60000) / 1000);
-  el.textContent = diff <= 0 ? '马上' : `${mins}:${String(secs).padStart(2,'0')}`;
+  const text = (() => {
+    if (!nextCheckTs) return '—';
+    const diff = Math.max(0, nextCheckTs - Date.now());
+    if (diff <= 0) return '马上';
+    const mins = Math.floor(diff / 60000);
+    const secs = Math.floor((diff % 60000) / 1000);
+    return `${mins}:${String(secs).padStart(2,'0')}`;
+  })();
+  // modal 里的倒计时
+  const mel = $('#modal-next-check');
+  if (mel) mel.textContent = text;
 }
 fetchDaemonStatus();
 setInterval(fetchDaemonStatus, 60000);   // 每分钟重新拉一次
