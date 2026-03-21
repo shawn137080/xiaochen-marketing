@@ -22,7 +22,7 @@ import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const IMAGES_DIR = resolve(__dirname, "../images");
+const IMAGES_DIR = process.env.XHS_IMAGES_DIR || resolve(__dirname, "../images");
 
 const CHECK_INTERVAL_MS = 10 * 60 * 1000; // 每 10 分钟检查一次
 const STATUS_FILE = resolve(__dirname, "../.daemon-status.json");
