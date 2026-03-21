@@ -126,6 +126,63 @@ const server = createServer(async (req, res) => {
         res.writeHead(404);
         res.end("Not found");
       }
+    } else if (url.pathname === "/api/drafts" && req.method === "GET") {
+      // 获取待审批草稿列表
+      const drafts = await db.xhsNote.findMany({
+        where: { status: "draft" },
+        orderBy: { createdAt: "desc" },
+      });
+      const data = drafts.map(n => ({
+        ...n,
+        tags: JSON.parse(n.tags || "[]"),
+        hasImage: existsSync(resolve(IMAGES_DIR, `${n.id}.png`)),
+      }));
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(data));
+    } else if (url.pathname.match(/^\/api\/notes\/[^/]+\/approve$/) && req.method === "POST") {
+      // 审批草稿：记录 diff，排期
+      const id = url.pathname.split("/")[3];
+      const chunks: Buffer[] = [];
+      req.on("data", (c: Buffer) => chunks.push(c));
+      await new Promise((r) => req.on("end", r));
+      const body = JSON.parse(Buffer.concat(chunks).toString()) as {
+        title?: string; content?: string; scheduledAt?: string;
+      };
+      const note = await db.xhsNote.findUnique({ where: { id } });
+      if (!note) { res.writeHead(404); res.end("Not found"); return; }
+
+      const finalTitle = body.title ?? note.title;
+      const finalContent = body.content ?? note.content;
+      const aiOriginal = note.aiDraft || note.content;
+
+      // 计算 diff 摘要（供下次 LLM 学习）
+      const userEdits = JSON.stringify({
+        titleChanged: finalTitle !== note.title,
+        contentChanged: finalContent !== aiOriginal,
+        originalTitle: note.title,
+        finalTitle,
+        summary: [
+          finalTitle !== note.title ? `标题改动: 「${note.title}」→「${finalTitle}」` : null,
+          finalContent !== aiOriginal ? "正文有修改" : null,
+        ].filter(Boolean).join("；") || "用户未修改，直接确认",
+      });
+
+      const scheduledAt = body.scheduledAt
+        ? new Date(body.scheduledAt)
+        : new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+      await db.xhsNote.update({
+        where: { id },
+        data: { title: finalTitle, content: finalContent, status: "scheduled", scheduledAt, approvedAt: new Date(), userEdits },
+      });
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+    } else if (url.pathname.match(/^\/api\/notes\/[^/]+$/) && req.method === "DELETE") {
+      // 丢弃草稿
+      const id = url.pathname.replace("/api/notes/", "");
+      await db.xhsNote.delete({ where: { id } });
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
     } else if (url.pathname.startsWith("/api/notes/") && req.method === "POST") {
       // Save note edits
       const id = url.pathname.replace("/api/notes/", "");
