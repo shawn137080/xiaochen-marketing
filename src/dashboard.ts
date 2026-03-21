@@ -121,13 +121,19 @@ const server = createServer(async (req, res) => {
       try {
         const response = await callMcp("check_login_status", {});
         const text = response.result?.content?.[0]?.text || "";
-        const loggedIn = !response.error && (text.includes("已登录") || text.includes("登录状态") || text.includes("logged in") || text.toLowerCase().includes("true") || text.includes("登录成功"));
+        const loggedIn = !response.error && (
+          text.includes("已登录") || text.includes("登录状态") ||
+          text.includes("logged in") || text.toLowerCase().includes("true") ||
+          text.includes("登录成功") || text.includes("处于登录")
+        );
+        console.log(`[login-status] loggedIn=${loggedIn} error=${JSON.stringify(response.error)} text="${text.slice(0, 120)}"`);
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ loggedIn, message: text }));
       } catch (err) {
-        console.error("[login-status] callMcp error:", err);
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("[login-status] callMcp threw:", msg);
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ loggedIn: false, message: "检查失败" }));
+        res.end(JSON.stringify({ loggedIn: false, message: `MCP错误: ${msg.slice(0, 60)}` }));
       }
     } else if (url.pathname === "/api/daemon-status") {
       try {
