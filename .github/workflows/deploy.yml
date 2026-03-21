@@ -17,6 +17,6 @@ jobs:
           script: |
             cd /opt/xhs-marketing
             git pull origin main
-            docker compose build xhs-marketing-tools
+            docker compose build tools
             docker compose up -d
             echo "✅ Deploy complete"
