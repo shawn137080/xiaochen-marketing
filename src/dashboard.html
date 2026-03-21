@@ -607,7 +607,7 @@ async function checkXhsLogin() {
   }
 }
 checkXhsLogin();
-setInterval(checkXhsLogin, 15000);
+setInterval(checkXhsLogin, 3 * 60 * 1000);
 
 // Daemon 状态 — 显示下次检查倒计时
 let nextCheckTs = null;

@@ -24,7 +24,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const IMAGES_DIR = process.env.XHS_IMAGES_DIR || resolve(__dirname, "../images");
 
-const CHECK_INTERVAL_MS = 10 * 60 * 1000; // 每 10 分钟检查一次
+const CHECK_INTERVAL_MS = 3 * 60 * 1000; // 每 3 分钟检查一次
 const STATUS_FILE = resolve(__dirname, "../.daemon-status.json");
 const COLLECT_AFTER_HOURS = [24, 72]; // 发布后多少小时采集
 
@@ -241,7 +241,7 @@ async function checkMcpHealth(): Promise<boolean> {
 
 async function run() {
   console.log("🤖 XHS Marketing Daemon started");
-  console.log(`   Check interval: ${CHECK_INTERVAL_MS / 1000 / 60} minutes`);
+  console.log(`   Check interval: ${CHECK_INTERVAL_MS / 1000 / 60} minutes (TEST MODE)`);
   console.log(`   Auto-optimize: rewrites scheduled notes based on performance data`);
   console.log(`   Auto-publish: scheduled notes published when due`);
   console.log(`   Auto-collect at: ${COLLECT_AFTER_HOURS.join("h, ")}h after publish`);
