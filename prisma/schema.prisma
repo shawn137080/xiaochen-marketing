@@ -1,0 +1,85 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// 笔记草稿和已发布内容
+model XhsNote {
+  id           String   @id @default(cuid())
+  xhsNoteId    String?  @unique // 小红书笔记 ID（发布后回填）
+  title        String // ≤20 字
+  content      String // 正文
+  tags         String   @default("[]") // JSON array of strings
+  noteType     String   @default("image") // image | video
+  industry     String? // renovation | cleaning | moving | hvac | landscaping | plumbing | general
+  contentAngle String? // pain_point | tool_review | case_study | data | comparison
+  titleFormula String? // fear | scene | tool | data | contrast
+  status       String   @default("draft") // draft | scheduled | published | archived
+  scheduledAt  DateTime?
+  publishedAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  metrics XhsNoteMetric[]
+  themes  XhsContentTheme[]
+  topIn   XhsReport[]       @relation("TopNote")
+}
+
+// 指标时间序列快照（每次采集一条）
+model XhsNoteMetric {
+  id        String   @id @default(cuid())
+  noteId    String
+  likes     Int      @default(0)
+  comments  Int      @default(0)
+  bookmarks Int      @default(0)
+  shares    Int      @default(0)
+  fetchedAt DateTime @default(now())
+
+  note XhsNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
+}
+
+// 选题去重记录
+model XhsContentTheme {
+  id     String   @id @default(cuid())
+  theme  String // 选题关键词
+  noteId String
+  usedAt DateTime @default(now())
+
+  note XhsNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
+}
+
+// 竞品笔记分析
+model XhsCompetitorNote {
+  id               String   @id @default(cuid())
+  xhsNoteId        String   @unique
+  author           String?
+  title            String?
+  likes            Int?
+  comments         Int?
+  bookmarks        Int?
+  analysis         String? // 小陈的分析结论
+  reusableElements String? // 可复制元素
+  fetchedAt        DateTime @default(now())
+}
+
+// 周报/月报
+model XhsReport {
+  id              String   @id @default(cuid())
+  periodType      String // weekly | monthly
+  periodStart     DateTime
+  periodEnd       DateTime
+  totalNotes      Int?
+  totalLikes      Int?
+  totalComments   Int?
+  totalBookmarks  Int?
+  topNoteId       String?
+  insights        String? // 分析总结
+  recommendations String? // 下期优化建议
+  createdAt       DateTime @default(now())
+
+  topNote XhsNote? @relation("TopNote", fields: [topNoteId], references: [id])
+}

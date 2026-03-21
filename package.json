@@ -1,0 +1,43 @@
+{
+  "name": "xhs",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "vitest run --config vitest.config.ts",
+    "post": "tsx src/post.ts",
+    "publish:note": "tsx src/publish.ts",
+    "collect": "tsx src/collect.ts",
+    "collect:one": "tsx src/collect.ts",
+    "optimize": "node --env-file=.env --import tsx src/optimize.ts",
+    "optimize:one": "node --env-file=.env --import tsx src/optimize.ts",
+    "status": "tsx src/status.ts",
+    "dashboard": "tsx src/dashboard.ts",
+    "generate-images": "node --env-file=.env --import tsx src/generate-images.ts",
+    "report": "tsx src/report.ts",
+    "report:monthly": "tsx src/report.ts monthly",
+    "daemon": "node --env-file=.env --import tsx src/daemon.ts",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "login-qr": "tsx src/login-qr.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/adapter-better-sqlite3": "^7.5.0",
+    "@prisma/client": "^7.5.0",
+    "better-sqlite3": "^12.8.0",
+    "jsqr": "^1.4.0",
+    "prisma": "^7.5.0",
+    "qrcode-terminal": "^0.12.0",
+    "sharp": "^0.34.5",
+    "tsx": "^4.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.0"
+  }
+}

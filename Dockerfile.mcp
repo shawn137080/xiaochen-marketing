@@ -1,0 +1,7 @@
+FROM xpzouying/xiaohongshu-mcp:latest
+
+# 把原版 chrome 改名，用 wrapper 替换，自动加上 --no-sandbox
+RUN mv /usr/bin/google-chrome /usr/bin/google-chrome-real && \
+    printf '#!/bin/sh\nexec /usr/bin/google-chrome-real --no-sandbox --disable-dev-shm-usage --disable-gpu "$@"\n' \
+      > /usr/bin/google-chrome && \
+    chmod +x /usr/bin/google-chrome

@@ -1,0 +1,5 @@
+node_modules
+xhs.db
+images/
+.env
+*.log

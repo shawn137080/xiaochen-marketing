@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小陈 Dashboard — AllDayAnswer 小红书营销</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, 'PingFang SC', 'Noto Sans SC', sans-serif; background: #0a0a0a; color: #e5e5e5; }
+
+  .header { padding: 24px 32px; border-bottom: 1px solid #1a1a1a; display: flex; align-items: center; gap: 16px; }
+  .header h1 { font-size: 20px; font-weight: 600; }
+  .header .subtitle { color: #737373; font-size: 13px; }
+  .header .status { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .header .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; }
+  .header .dot.offline { background: #ef4444; }
+
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid #1a1a1a; padding: 0 32px; }
+  .tab { padding: 12px 20px; cursor: pointer; color: #737373; font-size: 14px; border-bottom: 2px solid transparent; transition: all 0.2s; }
+  .tab:hover { color: #a3a3a3; }
+  .tab.active { color: #fff; border-bottom-color: #fff; }
+
+  .content { padding: 24px 32px; max-width: 1200px; }
+
+  /* Stats cards */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .stat-card { background: #141414; border: 1px solid #1f1f1f; border-radius: 8px; padding: 20px; }
+  .stat-card .label { color: #737373; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat-card .value { font-size: 32px; font-weight: 700; margin-top: 4px; }
+  .stat-card .value.scheduled { color: #f59e0b; }
+  .stat-card .value.published { color: #22c55e; }
+  .stat-card .value.draft { color: #6b7280; }
+
+  /* Notes table */
+  .notes-list { display: flex; flex-direction: column; gap: 12px; }
+  .note-card { background: #141414; border: 1px solid #1f1f1f; border-radius: 8px; padding: 16px 20px; display: flex; gap: 16px; align-items: flex-start; transition: border-color 0.2s; }
+  .note-card:hover { border-color: #333; }
+  .note-card .thumb { width: 80px; height: 80px; border-radius: 6px; background: #1f1f1f; overflow: hidden; flex-shrink: 0; }
+  .note-card .thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .note-card .info { flex: 1; min-width: 0; }
+  .note-card .title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .note-card .meta { display: flex; gap: 12px; color: #737373; font-size: 12px; flex-wrap: wrap; }
+  .note-card .meta span { display: flex; align-items: center; gap: 4px; }
+  .note-card .tags { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .note-card .tag { background: #1f1f1f; color: #a3a3a3; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
+  .note-card .content-preview { color: #737373; font-size: 13px; margin-top: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; }
+  .badge.scheduled { background: #422006; color: #fbbf24; }
+  .badge.published { background: #052e16; color: #4ade80; }
+  .badge.draft { background: #1a1a1a; color: #737373; }
+
+  .metrics-bar { display: flex; gap: 16px; margin-left: auto; flex-shrink: 0; align-items: center; }
+  .metric { text-align: center; min-width: 48px; }
+  .metric .num { font-size: 16px; font-weight: 600; }
+  .metric .lbl { color: #737373; font-size: 10px; }
+
+  /* Optimization timeline */
+  .timeline { display: flex; flex-direction: column; gap: 0; }
+  .timeline-item { padding: 20px; border-left: 2px solid #1f1f1f; margin-left: 12px; position: relative; }
+  .timeline-item::before { content: ''; position: absolute; left: -7px; top: 24px; width: 12px; height: 12px; border-radius: 50%; background: #3b82f6; border: 2px solid #0a0a0a; }
+  .timeline-item .time { color: #737373; font-size: 12px; margin-bottom: 6px; }
+  .timeline-item .title { font-weight: 600; font-size: 14px; margin-bottom: 8px; }
+  .timeline-item .detail { color: #a3a3a3; font-size: 13px; line-height: 1.6; white-space: pre-wrap; background: #141414; border: 1px solid #1f1f1f; border-radius: 6px; padding: 12px; }
+
+  /* Analytics */
+  .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .chart-card { background: #141414; border: 1px solid #1f1f1f; border-radius: 8px; padding: 20px; }
+  .chart-card h3 { font-size: 14px; color: #a3a3a3; margin-bottom: 16px; }
+  .bar-chart { display: flex; flex-direction: column; gap: 10px; }
+  .bar-row { display: flex; align-items: center; gap: 12px; }
+  .bar-label { width: 80px; font-size: 12px; color: #a3a3a3; text-align: right; flex-shrink: 0; }
+  .bar-track { flex: 1; height: 24px; background: #1a1a1a; border-radius: 4px; overflow: hidden; position: relative; }
+  .bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s; display: flex; align-items: center; padding-left: 8px; font-size: 11px; color: #fff; font-weight: 500; }
+  .bar-fill.likes { background: #ef4444; }
+  .bar-fill.comments { background: #3b82f6; }
+  .bar-fill.bookmarks { background: #f59e0b; }
+
+  /* Reports */
+  .report-card { background: #141414; border: 1px solid #1f1f1f; border-radius: 8px; padding: 20px; margin-bottom: 12px; }
+  .report-card .period { color: #737373; font-size: 12px; }
+  .report-card h3 { font-size: 15px; margin: 6px 0 12px; }
+  .report-card .body { color: #a3a3a3; font-size: 13px; line-height: 1.8; white-space: pre-wrap; }
+
+  .empty { text-align: center; color: #525252; padding: 60px 20px; font-size: 14px; }
+
+  @media (max-width: 768px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .chart-grid { grid-template-columns: 1fr; }
+    .note-card { flex-direction: column; }
+    .metrics-bar { margin-left: 0; }
+  }
+
+  /* Modal — 横版两栏，不需要 scroll */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 100; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: #141414; border: 1px solid #2a2a2a; border-radius: 12px; width: 100%; max-width: 1000px; height: 88vh; display: flex; overflow: hidden; position: relative; }
+  .modal-close { position: absolute; top: 12px; right: 12px; background: rgba(0,0,0,0.6); border: none; color: #ccc; cursor: pointer; width: 32px; height: 32px; border-radius: 6px; font-size: 16px; display: flex; align-items: center; justify-content: center; z-index: 10; }
+  .modal-close:hover { background: rgba(0,0,0,0.9); color: #fff; }
+  /* 左：图片面板，宽度 = 88vh × 3/4，让 3:4 图片完整显示 */
+  .modal-img-panel { width: calc(88vh * 0.75); max-width: 420px; flex-shrink: 0; background: #000; overflow: hidden; border-radius: 12px 0 0 12px; display: flex; align-items: center; justify-content: center; }
+  .modal-img-panel img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .modal-img-panel .no-img { color: #525252; font-size: 13px; }
+  /* 右：编辑面板，可滚动 */
+  .modal-body { flex: 1; overflow-y: auto; padding: 24px 24px 20px; display: flex; flex-direction: column; gap: 14px; }
+  .modal-body .note-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .edit-field { display: flex; flex-direction: column; gap: 5px; }
+  .edit-label { font-size: 10px; color: #525252; text-transform: uppercase; letter-spacing: 1px; }
+  .edit-input { background: #0f0f0f; border: 1px solid #2a2a2a; border-radius: 8px; color: #e5e5e5; font-family: inherit; font-size: 14px; padding: 9px 13px; outline: none; transition: border-color 0.15s; width: 100%; }
+  .edit-input:focus { border-color: #404040; }
+  .edit-title { font-size: 17px; font-weight: 600; }
+  .edit-textarea { resize: none; height: 260px; line-height: 1.8; }
+  .save-bar { display: flex; gap: 10px; align-items: center; }
+  .btn-save { background: #fff; color: #000; border: none; border-radius: 8px; padding: 9px 22px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; transition: opacity 0.15s; }
+  .btn-save:hover { opacity: 0.85; }
+  .btn-save:disabled { opacity: 0.4; cursor: not-allowed; }
+  .save-msg { font-size: 13px; color: #22c55e; display: none; }
+  .modal-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .modal-metric { background: #0f0f0f; border: 1px solid #1f1f1f; border-radius: 8px; padding: 10px; text-align: center; }
+  .modal-metric .num { font-size: 20px; font-weight: 700; }
+  .modal-metric .lbl { font-size: 10px; color: #737373; margin-top: 2px; }
+  .history-item { background: #0f0f0f; border: 1px solid #1f1f1f; border-radius: 6px; padding: 10px; margin-top: 6px; }
+  .history-item .h-time { font-size: 11px; color: #525252; margin-bottom: 4px; }
+  .history-item .h-metrics { display: flex; gap: 14px; font-size: 13px; }
+  .note-card { cursor: pointer; }
+  #modal-content { display: flex; height: 100%; width: 100%; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🧠 小陈 Dashboard</h1>
+  <span class="subtitle">AllDayAnswer 小红书营销系统</span>
+  <div class="status">
+    <div class="dot" id="daemonDot"></div>
+    <span style="font-size:12px;color:#737373" id="daemonStatus">检查中...</span>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" data-tab="schedule">排期管理</div>
+  <div class="tab" data-tab="analytics">数据分析</div>
+  <div class="tab" data-tab="evolution">进化记录</div>
+  <div class="tab" data-tab="reports">周报/月报</div>
+</div>
+
+<div class="content" id="content"></div>
+
+<!-- Note detail modal -->
+<div class="modal-overlay" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
+let currentTab = 'schedule';
+let data = { notes: [], reports: [], optimizations: [], analytics: {} };
+
+function openNote(id) {
+  const note = data.notes.find(n => n.id === id);
+  if (!note) return;
+
+  const date = note.status === 'published' ? formatDate(note.publishedAt) : formatDate(note.scheduledAt);
+  const latest = note.metrics?.[0];
+
+  let historyHtml = '';
+  if (note.metrics && note.metrics.length > 0) {
+    historyHtml = `<div class="edit-field"><div class="edit-label">数据快照</div>`;
+    for (const m of note.metrics) {
+      historyHtml += `
+        <div class="history-item">
+          <div class="h-time">${formatDate(m.fetchedAt)}</div>
+          <div class="h-metrics">
+            <span style="color:#ef4444">❤️ ${m.likes}</span>
+            <span style="color:#3b82f6">💬 ${m.comments}</span>
+            <span style="color:#f59e0b">⭐ ${m.bookmarks}</span>
+            <span style="color:#737373">↗️ ${m.shares}</span>
+          </div>
+        </div>`;
+    }
+    historyHtml += '</div>';
+  }
+
+  $('#modal-content').innerHTML = `
+    <div class="modal-img-panel">
+      ${note.hasImage
+        ? `<img src="/images/${note.id}.png?t=${Date.now()}" alt="${note.title}">`
+        : `<div class="no-img">暂无配图</div>`}
+    </div>
+    <div class="modal-body">
+      <div class="note-meta">
+        <span class="badge ${note.status}">${note.status === 'scheduled' ? '⏰ 排期' : note.status === 'published' ? '✅ 已发布' : '📝 草稿'}</span>
+        <span style="color:#737373;font-size:12px">${date}</span>
+        <span style="background:#1f1f1f;color:#a3a3a3;padding:2px 10px;border-radius:12px;font-size:11px">${note.industry || 'general'}</span>
+        <span style="background:#1f1f1f;color:#a3a3a3;padding:2px 10px;border-radius:12px;font-size:11px">${note.contentAngle || ''}</span>
+      </div>
+
+      <div class="edit-field">
+        <div class="edit-label">标题</div>
+        <input class="edit-input edit-title" id="edit-title" value="${note.title.replace(/"/g,'&quot;')}">
+      </div>
+
+      ${latest ? `
+      <div class="edit-field">
+        <div class="edit-label">最新数据</div>
+        <div class="modal-metrics" style="margin-top:4px">
+          <div class="modal-metric"><div class="num" style="color:#ef4444">${latest.likes}</div><div class="lbl">点赞</div></div>
+          <div class="modal-metric"><div class="num" style="color:#3b82f6">${latest.comments}</div><div class="lbl">评论</div></div>
+          <div class="modal-metric"><div class="num" style="color:#f59e0b">${latest.bookmarks}</div><div class="lbl">收藏</div></div>
+          <div class="modal-metric"><div class="num" style="color:#a3a3a3">${latest.shares}</div><div class="lbl">分享</div></div>
+        </div>
+      </div>` : ''}
+
+      <div class="edit-field">
+        <div class="edit-label">正文内容</div>
+        <textarea class="edit-input edit-textarea" id="edit-content">${note.content.replace(/</g,'&lt;')}</textarea>
+      </div>
+
+      <div class="edit-field">
+        <div class="edit-label">话题标签（逗号分隔）</div>
+        <input class="edit-input" id="edit-tags" value="${(note.tags||[]).join(', ')}">
+      </div>
+
+      <div class="save-bar">
+        <button class="btn-save" onclick="saveNote('${note.id}')">保存</button>
+        <span class="save-msg" id="save-msg">✓ 已保存</span>
+      </div>
+
+      ${historyHtml}
+    </div>`;
+
+  $('#modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+async function saveNote(id) {
+  const btn = $('.btn-save');
+  btn.disabled = true;
+  btn.textContent = '保存中...';
+
+  const title = $('#edit-title').value.trim();
+  const content = $('#edit-content').value;
+  const tags = $('#edit-tags').value.split(',').map(t => t.trim()).filter(Boolean);
+
+  try {
+    await fetch(`/api/notes/${id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, content, tags }),
+    });
+    // Update local cache
+    const note = data.notes.find(n => n.id === id);
+    if (note) { note.title = title; note.content = content; note.tags = tags; }
+    const msg = $('#save-msg');
+    msg.style.display = 'inline';
+    setTimeout(() => { msg.style.display = 'none'; }, 2000);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '保存';
+  }
+}
+
+function closeModal() {
+  $('#modal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// Tab switching
+$$('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    $$('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentTab = tab.dataset.tab;
+    render();
+  });
+});
+
+async function fetchAll() {
+  const [notes, reports, optimizations, analytics] = await Promise.all([
+    fetch('/api/notes').then(r => r.json()),
+    fetch('/api/reports').then(r => r.json()),
+    fetch('/api/optimizations').then(r => r.json()),
+    fetch('/api/analytics').then(r => r.json()),
+  ]);
+  data = { notes, reports, optimizations, analytics };
+
+  // Check daemon
+  try {
+    const res = await fetch('http://localhost:18060/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"dashboard","version":"1.0"}}}' });
+    if (res.ok) {
+      $('#daemonDot').className = 'dot';
+      $('#daemonStatus').textContent = 'MCP 在线';
+    }
+  } catch {
+    $('#daemonDot').className = 'dot offline';
+    $('#daemonStatus').textContent = 'MCP 离线';
+  }
+
+  render();
+}
+
+function formatDate(d) {
+  if (!d) return '—';
+  const date = new Date(d);
+  return date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }) + ' ' + date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+}
+
+function render() {
+  const el = $('#content');
+  switch (currentTab) {
+    case 'schedule': el.innerHTML = renderSchedule(); break;
+    case 'analytics': el.innerHTML = renderAnalytics(); break;
+    case 'evolution': el.innerHTML = renderEvolution(); break;
+    case 'reports': el.innerHTML = renderReports(); break;
+  }
+}
+
+function renderSchedule() {
+  const a = data.analytics;
+  let html = `
+    <div class="stats">
+      <div class="stat-card"><div class="label">总笔记</div><div class="value">${(a.totalScheduled||0)+(a.totalPublished||0)+(a.totalDraft||0)}</div></div>
+      <div class="stat-card"><div class="label">排期中</div><div class="value scheduled">${a.totalScheduled||0}</div></div>
+      <div class="stat-card"><div class="label">已发布</div><div class="value published">${a.totalPublished||0}</div></div>
+      <div class="stat-card"><div class="label">草稿</div><div class="value draft">${a.totalDraft||0}</div></div>
+    </div>
+    <div class="notes-list">`;
+
+  if (data.notes.length === 0) {
+    html += '<div class="empty">暂无笔记</div>';
+  }
+
+  for (const n of data.notes) {
+    const m = n.metrics?.[0];
+    const date = n.status === 'published' ? formatDate(n.publishedAt) : formatDate(n.scheduledAt);
+    const tags = (n.tags || []).map(t => `<span class="tag">${t}</span>`).join('');
+
+    html += `
+      <div class="note-card" onclick="openNote('${n.id}')">
+        <div class="thumb">
+          ${n.hasImage ? `<img src="/images/${n.id}.png" alt="">` : ''}
+        </div>
+        <div class="info">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
+            <span class="badge ${n.status}">${n.status === 'scheduled' ? '⏰ 排期' : n.status === 'published' ? '✅ 已发布' : '📝 草稿'}</span>
+            <span style="color:#737373;font-size:12px">${date}</span>
+            <span style="color:#525252;font-size:11px">${n.industry || ''}</span>
+          </div>
+          <div class="title">${n.title}</div>
+          <div class="content-preview">${n.content.slice(0, 100)}...</div>
+          <div class="tags">${tags}</div>
+        </div>
+        ${m ? `
+        <div class="metrics-bar">
+          <div class="metric"><div class="num" style="color:#ef4444">${m.likes}</div><div class="lbl">赞</div></div>
+          <div class="metric"><div class="num" style="color:#3b82f6">${m.comments}</div><div class="lbl">评</div></div>
+          <div class="metric"><div class="num" style="color:#f59e0b">${m.bookmarks}</div><div class="lbl">藏</div></div>
+          <div class="metric"><div class="num" style="color:#a3a3a3">${m.shares}</div><div class="lbl">转</div></div>
+        </div>` : ''}
+      </div>`;
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function renderAnalytics() {
+  const a = data.analytics;
+  if (a.totalPublished === 0) {
+    return '<div class="empty">还没有已发布的笔记数据，发布后 24h 自动采集</div>';
+  }
+
+  const maxVal = (obj, key) => Math.max(1, ...Object.values(obj).map(v => v[key]));
+
+  let industryBars = '';
+  for (const [name, v] of Object.entries(a.byIndustry || {})) {
+    const max = maxVal(a.byIndustry, 'likes');
+    industryBars += `
+      <div class="bar-row">
+        <div class="bar-label">${name}</div>
+        <div class="bar-track">
+          <div class="bar-fill likes" style="width:${(v.likes/max*100)}%">${v.likes} 赞</div>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill bookmarks" style="width:${(v.bookmarks/maxVal(a.byIndustry,'bookmarks')*100)}%">${v.bookmarks} 藏</div>
+        </div>
+      </div>`;
+  }
+
+  let angleBars = '';
+  for (const [name, v] of Object.entries(a.byAngle || {})) {
+    const max = maxVal(a.byAngle, 'likes');
+    angleBars += `
+      <div class="bar-row">
+        <div class="bar-label">${name}</div>
+        <div class="bar-track">
+          <div class="bar-fill likes" style="width:${(v.likes/max*100)}%">${v.likes} 赞</div>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill bookmarks" style="width:${(v.bookmarks/maxVal(a.byAngle,'bookmarks')*100)}%">${v.bookmarks} 藏</div>
+        </div>
+      </div>`;
+  }
+
+  return `
+    <div class="chart-grid">
+      <div class="chart-card">
+        <h3>📊 按行业表现</h3>
+        <div class="bar-chart">${industryBars || '<div class="empty">暂无数据</div>'}</div>
+      </div>
+      <div class="chart-card">
+        <h3>📐 按内容角度表现</h3>
+        <div class="bar-chart">${angleBars || '<div class="empty">暂无数据</div>'}</div>
+      </div>
+    </div>`;
+}
+
+function renderEvolution() {
+  if (data.optimizations.length === 0) {
+    return '<div class="empty">🧠 还没有优化记录<br><br>当有 ≥3 篇已发布笔记的数据后，daemon 会自动用 AI 分析效果好的 pattern，重写排期中的笔记</div>';
+  }
+
+  let html = '<h2 style="font-size:16px;margin-bottom:16px">🧬 AI 自进化记录</h2><div class="timeline">';
+  for (const opt of data.optimizations) {
+    html += `
+      <div class="timeline-item">
+        <div class="time">${formatDate(opt.createdAt)}</div>
+        <div class="detail">${opt.insights || ''}</div>
+      </div>`;
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderReports() {
+  const reports = data.reports.filter(r => !r.insights?.includes('自动优化'));
+  if (reports.length === 0) {
+    return '<div class="empty">📋 还没有周报/月报<br><br>每周日 daemon 自动生成周报，或手动运行 npm run report</div>';
+  }
+
+  let html = '';
+  for (const r of reports) {
+    html += `
+      <div class="report-card">
+        <div class="period">${r.periodType === 'weekly' ? '周报' : '月报'} | ${formatDate(r.periodStart)} ~ ${formatDate(r.periodEnd)}</div>
+        <h3>📋 ${r.periodType === 'weekly' ? '周报' : '月报'}</h3>
+        <div class="body">${r.insights || ''}\n\n💡 建议:\n${r.recommendations || ''}</div>
+      </div>`;
+  }
+  return html;
+}
+
+// Auto-refresh every 30s
+fetchAll();
+setInterval(fetchAll, 30000);
+</script>
+</body>
+</html>
