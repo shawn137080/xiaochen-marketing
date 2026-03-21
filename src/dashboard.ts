@@ -121,7 +121,7 @@ const server = createServer(async (req, res) => {
       try {
         const response = await callMcp("check_login_status", {});
         const text = response.result?.content?.[0]?.text || "";
-        const loggedIn = !response.error && (text.includes("已登录") || text.includes("logged in") || text.toLowerCase().includes("true") || text.includes("登录成功"));
+        const loggedIn = !response.error && (text.includes("已登录") || text.includes("登录状态") || text.includes("logged in") || text.toLowerCase().includes("true") || text.includes("登录成功"));
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ loggedIn, message: text }));
       } catch {
