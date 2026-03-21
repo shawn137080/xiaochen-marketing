@@ -20,7 +20,7 @@ const IMAGES_DIR = process.env.XHS_IMAGES_DIR || resolve(__dirname, "../images")
 // LLM 配置（用于生成 image prompt）
 const LLM_API_KEY = process.env.LLM_API_KEY || "";
 const LLM_BASE_URL = (process.env.LLM_BASE_URL || "https://aiberm.com/v1").replace(/\/$/, "");
-const LLM_MODEL = process.env.LLM_MODEL || "claude-sonnet-4-6";
+const LLM_MODEL = process.env.LLM_MODEL || "google/gemini-3-flash";
 
 // 加载技能指南（运行时读取，确保使用最新版本）
 function loadSkillGuide(): string {
