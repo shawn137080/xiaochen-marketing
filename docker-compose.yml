@@ -13,7 +13,7 @@ services:
       - xhs-images:/data/images     # 图片共享目录（与 tools 容器路径一致）
     environment:
       - ROD_BROWSER_BIN=/usr/bin/google-chrome
-    command: ["./app", "-headless=true", "-port", ":18060"]
+    command: ["sh", "-c", "ln -sf /app/cookies/cookies.json /app/cookies.json && ./app -headless=true -port :18060"]
 
   # ── xhs-tools：dashboard + daemon ──
   tools:
