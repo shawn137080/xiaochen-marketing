@@ -16,7 +16,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             cd /opt/xhs-marketing
-            git pull
+            git pull origin main
             docker compose build xhs-marketing-tools
             docker compose up -d
             echo "✅ Deploy complete"
