@@ -204,7 +204,7 @@ function openNote(id) {
     <div class="modal-body">
       <div class="note-meta">
         <span class="badge ${note.status}">${note.status === 'scheduled' ? '⏰ 排期' : note.status === 'published' ? '✅ 已发布' : '📝 草稿'}</span>
-        <span style="color:#737373;font-size:12px">${date}</span>
+        <span id="modal-date-display" style="color:#737373;font-size:12px">${date}</span>
         <span style="background:#1f1f1f;color:#a3a3a3;padding:2px 10px;border-radius:12px;font-size:11px">${note.industry || 'general'}</span>
         <span style="background:#1f1f1f;color:#a3a3a3;padding:2px 10px;border-radius:12px;font-size:11px">${note.contentAngle || ''}</span>
       </div>
@@ -281,6 +281,11 @@ async function saveNote(id) {
       note.title = title; note.content = content; note.tags = tags;
       if (scheduledAt) note.scheduledAt = new Date(scheduledAt).toISOString();
     }
+    // 更新 modal 顶部日期显示
+    const modalDate = $('#modal-date-display');
+    if (modalDate && note && note.scheduledAt) modalDate.textContent = formatDate(note.scheduledAt);
+    // 重新渲染卡片列表
+    render();
     const msg = $('#save-msg');
     msg.style.display = 'inline';
     setTimeout(() => { msg.style.display = 'none'; }, 2000);
