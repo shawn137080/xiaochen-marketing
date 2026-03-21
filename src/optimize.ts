@@ -12,7 +12,7 @@
  * 配置 (env):
  *   LLM_API_KEY    — API key（必填）
  *   LLM_BASE_URL   — OpenAI 兼容接口地址（默认 https://aiberm.com/v1）
- *   LLM_MODEL      — 模型名（默认 claude-sonnet-4-6）
+ *   LLM_MODEL      — 模型名（默认 google/gemini-3-flash）
  *
  * daemon 在每次发布前自动调用
  */
@@ -30,7 +30,7 @@ import { fileURLToPath } from "node:url";
 
 const LLM_BASE_URL = process.env.LLM_BASE_URL || "https://aiberm.com/v1";
 const LLM_API_KEY = process.env.LLM_API_KEY || "";
-const LLM_MODEL = process.env.LLM_MODEL || "claude-sonnet-4-6";
+const LLM_MODEL = process.env.LLM_MODEL || "google/gemini-3-flash";
 
 async function callLLM(prompt: string): Promise<string> {
   if (!LLM_API_KEY) {
