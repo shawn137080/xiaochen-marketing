@@ -267,7 +267,7 @@ async function saveNote(id) {
   const content = $('#edit-content').value;
   const tags = $('#edit-tags').value.split(',').map(t => t.trim()).filter(Boolean);
   const scheduledAtEl = $('#edit-scheduled-at');
-  const scheduledAt = scheduledAtEl ? scheduledAtEl.value : undefined;
+  const scheduledAt = scheduledAtEl ? easternInputToIso(scheduledAtEl.value) : undefined;
 
   try {
     await fetch(`/api/notes/${id}`, {
@@ -352,6 +352,21 @@ function toLocalDatetimeInput(d) {
   }).formatToParts(date);
   const get = t => parts.find(p => p.type === t)?.value || '00';
   return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`;
+}
+
+// datetime-local 字符串（Eastern 时间，无时区）→ UTC ISO 字符串
+function easternInputToIso(localStr) {
+  if (!localStr) return undefined;
+  // 先把字符串当 UTC 解析，用它来查这一刻 Eastern 的 UTC 偏移量
+  const asUtc = new Date(localStr + ':00Z');
+  const etFormatted = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit',
+  }).format(asUtc).replace(' ', 'T');
+  const utcFormatted = asUtc.toISOString().slice(0, 16);
+  const offsetMs = new Date(etFormatted + 'Z') - new Date(utcFormatted + 'Z');
+  // localStr 是 Eastern 时间，减去偏移即得 UTC
+  return new Date(new Date(localStr + ':00Z').getTime() - offsetMs).toISOString();
 }
 
 function render() {
