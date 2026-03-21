@@ -1,9 +1,12 @@
 /**
  * 用 Gemini API 为排期笔记生成配图
- * 文字直接嵌入 Gemini prompt，不用 sharp SVG overlay（避免 Docker 中文字体乱码）
+ * 两步流程：
+ *   1. LLM（LLM_API_KEY）读取 skills/xhs-image-prompts/SKILL.md + 笔记内容 → 输出 Gemini 图片 prompt
+ *   2. Gemini 根据 prompt 生成图片
+ * 这样技能文件更新后生图质量自动提升，无需改代码。
  */
 import { db } from "./db";
-import { writeFileSync, existsSync } from "node:fs";
+import { writeFileSync, readFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -13,6 +16,22 @@ const __dirname = dirname(__filename);
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const GEMINI_MODEL = "gemini-3.1-flash-image-preview";
 const IMAGES_DIR = process.env.XHS_IMAGES_DIR || resolve(__dirname, "../images");
+
+// LLM 配置（用于生成 image prompt）
+const LLM_API_KEY = process.env.LLM_API_KEY || "";
+const LLM_BASE_URL = (process.env.LLM_BASE_URL || "https://aiberm.com/v1").replace(/\/$/, "");
+const LLM_MODEL = process.env.LLM_MODEL || "claude-sonnet-4-6";
+
+// 加载技能指南（运行时读取，确保使用最新版本）
+function loadSkillGuide(): string {
+  const skillPath = resolve(__dirname, "../../skills/xhs-image-prompts/SKILL.md");
+  try {
+    return readFileSync(skillPath, "utf-8");
+  } catch {
+    console.warn("   ⚠️  找不到 skills/xhs-image-prompts/SKILL.md，使用内置 prompt");
+    return "";
+  }
+}
 
 // ── 模板类型 ──────────────────────────────────────────────────────────────
 type Template = "scene" | "data" | "tool" | "before_after" | "text_card";
@@ -107,28 +126,70 @@ const NOTE_CONFIGS: Record<string, NoteImageConfig> = {
   },
 };
 
-// 行业对应场景 prompt
-const SCENE_PROMPTS: Record<string, string> = {
-  beauty: "A Chinese female aesthetician in her 30s in white uniform, carefully applying face mask on a client, phone visible showing missed call — conflicted anxious glance toward it. Warm peachy salon light.",
-  plumbing: "A Chinese plumber in his 30s in a work truck cab, staring at phone screen showing missed call with a helpless expression — warm interior truck light, raindrops on windshield.",
-  landscaping: "A Chinese landscaper in his 30s kneeling in a lush Canadian suburban garden, vibrating phone just out of reach — dramatic summer noon light, urgency in his face.",
-  hvac: "A Chinese HVAC technician in insulated jacket on a Canadian rooftop, phone in gloved hand showing several missed calls — overcast sky, expression of quiet frustration.",
-  cleaning: "A Chinese female cleaning company owner in her 40s standing outside a house she just finished, holding phone showing missed-call notification, slight tired-but-determined expression. Soft golden afternoon light.",
-  renovation: "A weathered Chinese male contractor in his 40s sitting on half-finished hardwood floor, sawdust on clothes, staring at phone showing 3 missed calls with a strained tired expression. Dramatic overhead construction lighting.",
-  general: "A focused Chinese small business owner in his late 30s at a cafe table, laptop open, looking at phone showing missed calls — warm mood lighting, expression of quiet frustration.",
-};
-
-const SPLIT_SCENE: Record<string, string> = {
-  general: "A Chinese small business owner in his 40s: top half shows him at chaotic cluttered desk, phone blazing with 6 missed calls, visibly overwhelmed under harsh late-night lamp; bottom half shows same man at minimalist tidy desk, coffee in hand, phone showing organized call log, confident half-smile in crisp morning light.",
-  moving: "A Chinese moving company owner 30s: top half shows him surrounded by cardboard boxes on Canadian sidewalk, staring at ringing phone under harsh midday sun; bottom half shows same man calmly reviewing client list on phone at desk with soft indoor evening light.",
-};
-
 interface GeminiResponse {
   candidates?: Array<{ content: { parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> } }>;
   error?: { message: string };
 }
 
-async function callGemini(prompt: string): Promise<Buffer | null> {
+// ── Step 1: LLM 根据技能指南生成 Gemini image prompt ─────────────────────
+
+async function generateImagePromptWithSkill(
+  note: { title: string; content: string; industry: string | null; contentAngle: string | null },
+  cfg: NoteImageConfig,
+  skillGuide: string,
+): Promise<string | null> {
+  if (!LLM_API_KEY) return null;
+
+  const systemPrompt = `你是小红书爆款图片设计师，专为加拿大华人小老板服务（品牌：兜兜AI）。
+你将根据笔记内容和设计技能指南，为 Gemini 图像生成模型写一个精准的中文 image prompt。
+
+设计技能指南如下：
+---
+${skillGuide}
+---
+
+输出要求：
+- 只输出一段 Gemini image prompt，不要有任何解释或前缀
+- prompt 用中文，直接描述图像
+- 必须包含笔记的核心文字钩子（要求图中渲染出来）
+- 必须包含"兜兜AI"品牌标识
+- 必须指定比例（9:16竖版 用于卡片类，3:4 用于人物场景类）
+- 加上负面词：无水印，无失真人脸，无强烈阴影`;
+
+  const userPrompt = `请为以下笔记生成配图 prompt：
+
+标题：${note.title}
+行业：${note.industry ?? "通用"}
+内容风格：${note.contentAngle ?? cfg.template}
+钩子文字：${cfg.hookText.replace("\n", " / ")}
+${cfg.subText ? `副标题：${cfg.subText}` : ""}
+${cfg.bigNumber ? `核心数据：${cfg.bigNumber}（${cfg.bigLabel ?? ""}）` : ""}`;
+
+  try {
+    const res = await fetch(`${LLM_BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${LLM_API_KEY}` },
+      body: JSON.stringify({
+        model: LLM_MODEL,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        max_tokens: 800,
+        temperature: 0.7,
+      }),
+    });
+    const data = await res.json() as { choices?: Array<{ message: { content: string } }> };
+    return data.choices?.[0]?.message?.content?.trim() ?? null;
+  } catch (err) {
+    console.error(`   LLM error:`, err);
+    return null;
+  }
+}
+
+// ── Step 2: Gemini 根据 prompt 生成图片 ──────────────────────────────────
+
+async function callGemini(prompt: string, aspectRatio: "3:4" | "9:16" = "3:4"): Promise<Buffer | null> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
   const res = await fetch(url, {
     method: "POST",
@@ -137,7 +198,7 @@ async function callGemini(prompt: string): Promise<Buffer | null> {
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
         responseModalities: ["TEXT", "IMAGE"],
-        imageConfig: { aspectRatio: "3:4" },
+        imageConfig: { aspectRatio },
       },
     }),
   });
@@ -149,108 +210,21 @@ async function callGemini(prompt: string): Promise<Buffer | null> {
   return null;
 }
 
-// ── 模板 prompts ──────────────────────────────────────────────────────────
-
-function buildScenePrompt(cfg: NoteImageConfig, industry: string): string {
-  const scene = SCENE_PROMPTS[industry] || SCENE_PROMPTS.general;
-  const [line1, line2] = cfg.hookText.split("\n");
-  return `Photorealistic editorial photography, Sony A7 IV 35mm f/1.8, dramatic cinematic lighting, vivid color grading. Vertical 3:4 ratio.
-
-Scene: ${scene}
-
-In the lower third of the image, add a dark gradient overlay (transparent to black) with the following Chinese text rendered in clean bold white sans-serif font:
-- Large headline line 1: "${line1}"
-- Large headline line 2: "${line2}"
-${cfg.subText ? `- Smaller subtitle below: "${cfg.subText}"` : ""}
-
-In the bottom-right corner, add a small dark semi-transparent rounded pill label with white text "兜兜AI".
-
-The Chinese text must be clearly legible, correctly rendered, no typos.`;
-}
-
-function buildDataPrompt(cfg: NoteImageConfig): string {
-  const [h1, h2] = cfg.hookText.split("\n");
-  return `Design a professional Chinese social media infographic card, vertical 3:4 ratio, dark navy blue background (#0F1C2E).
-
-Layout (top to bottom):
-1. Top header area with subtle dark red tint, containing bold white Chinese text:
-   Line 1: "${h1}"
-   Line 2: "${h2}"
-2. A thin bright red left border accent on the entire card.
-3. Center: giant bold red number/text "${cfg.bigNumber ?? ""}" taking up much of the width.
-4. Below the number: white Chinese text "${cfg.bigLabel ?? ""}"
-5. Thin horizontal separator line.
-6. Two lines of supporting data:
-   Gray text: "${cfg.dataSub1 ?? ""}"
-   Coral/orange bold text: "${cfg.dataSub2 ?? ""}"
-7. Bottom-left: small red rounded rectangle badge with white text "兜兜AI".
-
-All Chinese text must be correctly rendered, clean modern sans-serif, no decorative elements, pure graphic design style.`;
-}
-
-function buildToolPrompt(cfg: NoteImageConfig, industry: string): string {
-  const [line1, line2] = cfg.hookText.split("\n");
-  const bgDesc = industry === "beauty"
-    ? "Clean minimal beauty salon station, top-down view, white marble surface, small rose gold details, soft warm light. No text, no people."
-    : "Clean minimal modern desk workspace, top-down flat-lay, light oak wood surface, small succulent, phone, notebook, soft natural window light. No text, no people.";
-
-  return `${bgDesc} Vertical 3:4 ratio.
-
-Overlay the following graphic elements on this background:
-1. Top: vivid red banner (#FF3B30) spanning the full width, containing bold white Chinese text centered:
-   Line 1: "${line1}"
-   Line 2: "${line2}"
-2. Bottom: semi-transparent white frosted card area (last ~25% of image height) with Chinese text centered:
-   "${cfg.subText ?? ""}"
-3. At the very bottom center: a small vivid red rounded button with white text "兜兜AI".
-
-All Chinese text must be correctly rendered, clean sans-serif, clearly legible.`;
-}
-
-function buildBeforeAfterPrompt(cfg: NoteImageConfig, noteTitle: string): string {
-  const industry = noteTitle.includes("搬家") ? "moving" : "general";
-  const scene = SPLIT_SCENE[industry] || SPLIT_SCENE.general;
-  const [h1, h2] = cfg.hookText.split("\n");
-  const centerText = noteTitle.includes("搬家") ? "旺季多接30%的单" : "用AI和没用，差距出来了";
-
-  return `Vertical split photo composition, 3:4 ratio. ${scene}
-
-Add these text overlays:
-1. Top-left: dark semi-transparent rounded pill with bold white Chinese text "以前"
-2. Center horizontal divider strip (dark semi-transparent band) with bold red Chinese text: "${centerText}"
-3. Bottom-left: dark semi-transparent rounded pill with bold white Chinese text "现在"
-4. Bottom-right corner: small dark rounded pill "兜兜AI" in white
-
-Also, the overall image should evoke the concept: "${h1} ${h2}"
-
-All Chinese text must be correctly rendered, clean and legible.`;
-}
-
-function buildTextCardPrompt(cfg: NoteImageConfig): string {
-  const [h1, h2] = cfg.hookText.split("\n");
-  const subLines = (cfg.subText ?? "").split("\n");
-
-  return `Design a clean warm Chinese social media text card, vertical 3:4 ratio.
-
-Background: warm cream color (#FDF6EC).
-
-Layout:
-1. Very top: thin vivid red accent stripe across full width.
-2. Upper area: large decorative quotation mark in very light red (nearly invisible, decorative).
-3. Center headline (large bold Chinese text):
-   Black: "${h1}"
-   Red (#FF3B30): "${h2}"
-4. Below: thin red horizontal divider line.
-5. Body text (smaller, warm brown, centered):
-${subLines.map(l => `   "${l}"`).join("\n")}
-6. Bottom center: small vivid red (#FF3B30) rounded rectangle button with white text "兜兜AI".
-
-All Chinese text must be correctly rendered, modern clean sans-serif typography, no photos.`;
+// 根据模板类型决定比例
+function getAspectRatio(template: Template): "3:4" | "9:16" {
+  return template === "scene" || template === "before_after" ? "3:4" : "9:16";
 }
 
 // ── 主流程 ────────────────────────────────────────────────────────────────
 async function main() {
   if (!GEMINI_API_KEY) { console.error("GEMINI_API_KEY is required"); process.exit(1); }
+
+  const skillGuide = loadSkillGuide();
+  const useSkill = !!skillGuide && !!LLM_API_KEY;
+  console.log(useSkill
+    ? "🧠 技能模式：LLM 读取 SKILL.md → 生成 prompt → Gemini 生图\n"
+    : "⚙️  标准模式：使用内置 prompt（未配置 LLM_API_KEY 或找不到技能文件）\n"
+  );
 
   const allNotes = await db.xhsNote.findMany({
     where: { status: "scheduled" },
@@ -258,40 +232,56 @@ async function main() {
   });
 
   const notes = allNotes.filter(n => NOTE_CONFIGS[n.title]);
-  console.log(`🎨 生成 ${notes.length} 篇笔记配图（文字嵌入 prompt）\n`);
+  console.log(`🎨 生成 ${notes.length} 篇笔记配图\n`);
 
   for (const note of notes) {
     const cfg = NOTE_CONFIGS[note.title];
     const filepath = resolve(IMAGES_DIR, `${note.id}.png`);
+    const ratio = getAspectRatio(cfg.template);
 
-    console.log(`📐 [${cfg.template}] "${note.title}"`);
+    console.log(`📐 [${cfg.template}/${ratio}] "${note.title}"`);
 
-    let buf: Buffer | null = null;
+    let imagePrompt: string | null = null;
+
+    // Step 1: 用技能指南生成 image prompt（有 LLM 时）
+    if (useSkill) {
+      imagePrompt = await generateImagePromptWithSkill(
+        { title: note.title, content: note.content, industry: note.industry, contentAngle: note.contentAngle },
+        cfg,
+        skillGuide,
+      );
+      if (imagePrompt) {
+        console.log(`   🧠 LLM prompt: ${imagePrompt.slice(0, 80)}...`);
+      } else {
+        console.log(`   ⚠️  LLM 未返回 prompt，使用内置模板`);
+      }
+    }
+
+    // Step 2: 生成图片（用 LLM prompt 或内置 fallback）
+    if (!imagePrompt) {
+      // 内置 fallback prompt（精简版）
+      const [h1, h2] = cfg.hookText.split("\n");
+      imagePrompt = cfg.template === "data"
+        ? `设计小红书竖版9:16数据海报，深色背景，核心数字"${cfg.bigNumber ?? ""}"超大红色字体居中，标题"${h1} ${h2}"，说明"${cfg.bigLabel ?? ""}"，支撑数据"${cfg.dataSub1 ?? ""} ${cfg.dataSub2 ?? ""}"，右下角"兜兜AI"品牌标。简洁专业。无水印。`
+        : cfg.template === "tool"
+        ? `创作手绘风格信息图卡片，比例9:16竖版，米色纸质背景，红黑毛笔草书大标题"${h1} ${h2}"，副标题"${cfg.subText ?? ""}"，手绘插画点缀，底部"兜兜AI"品牌标。无水印，无失真人脸。`
+        : cfg.template === "text_card"
+        ? `设计小红书竖版9:16文字卡，暖米色背景，大标题"${h1}"黑色、"${h2}"红色，副文字"${cfg.subText ?? ""}"，顶部红色细线，底部"兜兜AI"按钮。无水印。`
+        : `写实电影摄影风格，3:4竖版，加拿大华人小老板工作场景（行业：${note.industry ?? "通用"}），漏接电话的情绪，画面底部白色大字"${h1} ${h2}"，右下角"兜兜AI"标。无水印，无失真人脸。`;
+    }
 
     try {
-      if (cfg.template === "scene") {
-        buf = await callGemini(buildScenePrompt(cfg, note.industry || "general"));
-      } else if (cfg.template === "data") {
-        buf = await callGemini(buildDataPrompt(cfg));
-      } else if (cfg.template === "tool") {
-        buf = await callGemini(buildToolPrompt(cfg, note.industry || "general"));
-      } else if (cfg.template === "before_after") {
-        buf = await callGemini(buildBeforeAfterPrompt(cfg, note.title));
-      } else if (cfg.template === "text_card") {
-        buf = await callGemini(buildTextCardPrompt(cfg));
-      }
-
+      const buf = await callGemini(imagePrompt, ratio);
       if (buf) {
         writeFileSync(filepath, buf);
         console.log(`   ✅ 保存 (${(buf.length / 1024).toFixed(0)}KB)\n`);
       } else {
-        console.log(`   ❌ 生成失败，跳过\n`);
+        console.log(`   ❌ Gemini 生成失败，跳过\n`);
       }
     } catch (err) {
       console.error(`   ❌ 出错:`, err);
     }
 
-    // 限速
     await new Promise(r => setTimeout(r, 3000));
   }
 
