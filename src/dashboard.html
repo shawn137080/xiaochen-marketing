@@ -243,7 +243,8 @@ function openNote(id) {
       <div class="edit-field">
         <div class="edit-label">📅 发布时间</div>
         <input class="edit-input" id="edit-scheduled-at" type="datetime-local"
-          value="${note.scheduledAt ? new Date(note.scheduledAt).toISOString().slice(0,16) : ''}">
+          style="cursor:pointer;color-scheme:dark"
+          value="${note.scheduledAt ? toLocalDatetimeInput(note.scheduledAt) : ''}">
       </div>` : ''}
 
       <div class="save-bar">
@@ -333,6 +334,13 @@ function formatDate(d) {
   return date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }) + ' ' + date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
 }
 
+function toLocalDatetimeInput(d) {
+  if (!d) return '';
+  const date = new Date(d);
+  const pad = n => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 function render() {
   const el = $('#content');
   switch (currentTab) {
@@ -372,7 +380,7 @@ function renderSchedule() {
         <div class="info">
           <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
             <span class="badge ${n.status}">${n.status === 'scheduled' ? '⏰ 排期' : n.status === 'published' ? '✅ 已发布' : '📝 草稿'}</span>
-            <span style="color:#737373;font-size:12px">${date}</span>
+            <span style="color:${n.status === 'scheduled' ? '#f59e0b' : '#737373'};font-size:13px;font-weight:${n.status === 'scheduled' ? '600' : '400'}">${date}</span>
             <span style="color:#525252;font-size:11px">${n.industry || ''}</span>
           </div>
           <div class="title">${n.title}</div>
