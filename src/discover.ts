@@ -3,7 +3,7 @@
  *
  * 用法: npx tsx src/discover.ts
  *
- * 触发时机: daemon 在每周一、三、五 02:00 自动调用
+ * 触发时机: daemon 每天 16:00 EST 自动调用，生成 2 篇草稿（含去重）
  *
  * 流程:
  *   1. 读取行业轮换游标（XhsConfig）
@@ -248,9 +248,34 @@ ${userEditsCtx}
 
 // ── 存草稿 ────────────────────────────────────────────────────────────────
 
+function tokenize(title: string): string[] {
+  return title.split(/[\s，。！？、""''「」《》【】\-—·]/g).filter(w => w.length > 1);
+}
+
+function isSimilar(a: string, b: string): boolean {
+  if (a === b) return true;
+  const aWords = new Set(tokenize(a));
+  const bWords = new Set(tokenize(b));
+  if (aWords.size === 0 || bWords.size === 0) return false;
+  const overlap = [...aWords].filter(w => bWords.has(w)).length;
+  return overlap >= Math.min(aWords.size, bWords.size) * 0.6;
+}
+
 async function saveDrafts(notes: GeneratedNote[]): Promise<Array<{ id: string; title: string }>> {
+  // 查现有 draft/scheduled 标题，用于去重
+  const existing = await db.xhsNote.findMany({
+    where: { status: { in: ["draft", "scheduled"] } },
+    select: { title: true },
+  });
+  const existingTitles = existing.map(n => n.title);
+
   const saved: Array<{ id: string; title: string }> = [];
   for (const n of notes) {
+    const dup = existingTitles.find(t => isSimilar(t, n.title));
+    if (dup) {
+      console.log(`   ⏭️  跳过重复草稿: 「${n.title}」（与「${dup}」相似）`);
+      continue;
+    }
     const note = await db.xhsNote.create({
       data: {
         title: n.title,
@@ -262,6 +287,7 @@ async function saveDrafts(notes: GeneratedNote[]): Promise<Array<{ id: string; t
         aiDraft: n.content, // 保存 AI 原始版本，用于后续 diff
       },
     });
+    existingTitles.push(note.title); // 防止同批次内重复
     saved.push({ id: note.id, title: note.title });
     console.log(`   ✅ 草稿已存: 「${note.title}」(${note.id})`);
   }

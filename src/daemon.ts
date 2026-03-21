@@ -200,13 +200,15 @@ let lastDiscover = "";
 
 async function checkAndDiscover() {
   const now = new Date();
-  const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
-  const hour = now.getHours();
-  const dateStr = now.toISOString().split("T")[0];
+  // 用美东时间判断（自动处理 EST/EDT 切换）
+  const estHour = parseInt(
+    new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", hour12: false }).format(now),
+    10,
+  );
+  const dateStr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(now); // YYYY-MM-DD
 
-  // 只在周一(1)、周三(3)、周五(5) 的 02:00-02:59 执行
-  if (![1, 3, 5].includes(dayOfWeek)) return;
-  if (hour !== 2) return;
+  // 每天 16:00–16:59 EST/EDT 执行一次
+  if (estHour !== 16) return;
   if (lastDiscover === dateStr) return;
 
   console.log(`[${now.toLocaleTimeString()}] 🔍 Running discover (competitor research + draft generation)...`);
@@ -244,7 +246,7 @@ async function run() {
   console.log(`   Auto-publish: scheduled notes published when due`);
   console.log(`   Auto-collect at: ${COLLECT_AFTER_HOURS.join("h, ")}h after publish`);
   console.log(`   Weekly report: every Sunday`);
-  console.log(`   Auto-discover: Mon/Wed/Fri 02:00 — competitor research + draft generation`);
+  console.log(`   Auto-discover: daily 16:00 EST — competitor research + draft generation`);
   console.log("");
 
   // 检查 MCP 是否在线
