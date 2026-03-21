@@ -15,6 +15,7 @@ import { collectOne } from "./collect";
 import { callMcp } from "./publish";
 import { generateReport } from "./report";
 import { optimizeNote } from "./optimize";
+import { runDiscover } from "./discover";
 import { existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -194,6 +195,28 @@ async function checkWeeklyReport() {
   }
 }
 
+let lastDiscover = "";
+
+async function checkAndDiscover() {
+  const now = new Date();
+  const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+  const hour = now.getHours();
+  const dateStr = now.toISOString().split("T")[0];
+
+  // 只在周一(1)、周三(3)、周五(5) 的 02:00-02:59 执行
+  if (![1, 3, 5].includes(dayOfWeek)) return;
+  if (hour !== 2) return;
+  if (lastDiscover === dateStr) return;
+
+  console.log(`[${now.toLocaleTimeString()}] 🔍 Running discover (competitor research + draft generation)...`);
+  try {
+    await runDiscover();
+    lastDiscover = dateStr;
+  } catch (err) {
+    console.error("Discover failed:", err);
+  }
+}
+
 async function checkMcpHealth(): Promise<boolean> {
   try {
     const mcpUrl = process.env.XHS_MCP_URL || "http://localhost:18060/mcp";
@@ -220,6 +243,7 @@ async function run() {
   console.log(`   Auto-publish: scheduled notes published when due`);
   console.log(`   Auto-collect at: ${COLLECT_AFTER_HOURS.join("h, ")}h after publish`);
   console.log(`   Weekly report: every Sunday`);
+  console.log(`   Auto-discover: Mon/Wed/Fri 02:00 — competitor research + draft generation`);
   console.log("");
 
   // 检查 MCP 是否在线
@@ -236,6 +260,7 @@ async function run() {
   await checkAndCollect();
   await checkAndOptimize();
   await checkWeeklyReport();
+  await checkAndDiscover();
 
   // 定时循环
   setInterval(async () => {
@@ -244,6 +269,7 @@ async function run() {
       await checkAndCollect();
       await checkAndOptimize();
       await checkWeeklyReport();
+      await checkAndDiscover();
     } catch (err) {
       console.error(`[${new Date().toLocaleTimeString()}] Daemon error:`, err);
     }
