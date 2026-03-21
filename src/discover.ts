@@ -160,6 +160,27 @@ function loadAgentContext(): string {
   return "你是小陈，AllDayAnswer 的小红书增长负责人，专注加拿大华人小老板市场。";
 }
 
+// ── 读取爆款大脑 skill ────────────────────────────────────────────────────
+
+function loadViralBrain(): string {
+  const paths = [
+    // Docker 容器内路径（COPY skills ./skills → /app/skills/）
+    resolve(__dirname, "../skills/xhs-viral-brain/SKILL.md"),
+    resolve(__dirname, "../../skills/xhs-viral-brain/SKILL.md"),
+    // 本地开发路径
+    resolve(process.env.HOME || "/root", ".claude/skills/xhs-viral-brain/SKILL.md"),
+  ];
+  for (const p of paths) {
+    try {
+      const content = readFileSync(p, "utf-8");
+      console.log(`   🧠 爆款大脑已加载: ${p}`);
+      return content;
+    } catch { /* 继续尝试 */ }
+  }
+  console.warn("   ⚠️  找不到 xhs-viral-brain/SKILL.md，不使用爆款大脑");
+  return "";
+}
+
 // ── LLM 分析 + 生成 ──────────────────────────────────────────────────────
 
 interface GeneratedNote {
@@ -174,6 +195,7 @@ async function analyzeAndGenerate(
   insights: InsightRow[],
   agentContext: string,
   userEditsCtx: string,
+  viralBrain: string,
 ): Promise<GeneratedNote[]> {
   if (!LLM_API_KEY) throw new Error("LLM_API_KEY 未设置");
 
@@ -182,7 +204,11 @@ async function analyzeAndGenerate(
     .map(i => `- 「${i.title}」（搜索词: ${i.keyword}，赞${i.likes}）`)
     .join("\n");
 
-  const prompt = `${agentContext}
+  const brainSection = viralBrain
+    ? `\n---\n\n## 爆款写作大脑（必须严格遵守）\n\n${viralBrain}\n\n---\n`
+    : "";
+
+  const prompt = `${agentContext}${brainSection}
 
 ---
 
@@ -356,12 +382,13 @@ export async function runDiscover() {
   // 3. 加载上下文
   const agentContext = loadAgentContext();
   const userEditsCtx = await loadUserEditsContext();
+  const viralBrain = loadViralBrain();
 
   // 4. LLM 分析 + 生成
   console.log("   🧠 LLM 分析爆款规律并生成新笔记...");
   let generated: GeneratedNote[] = [];
   try {
-    generated = await analyzeAndGenerate(insights, agentContext, userEditsCtx);
+    generated = await analyzeAndGenerate(insights, agentContext, userEditsCtx, viralBrain);
   } catch (err) {
     console.error("   ❌ LLM 生成失败:", err);
     await db.$disconnect();

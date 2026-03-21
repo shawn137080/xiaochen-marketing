@@ -14,6 +14,7 @@ RUN npm ci --omit=dev
 # Copy source
 COPY prisma ./prisma
 COPY src ./src
+COPY skills ./skills
 COPY tsconfig.json ./
 COPY prisma.config.ts ./
 
