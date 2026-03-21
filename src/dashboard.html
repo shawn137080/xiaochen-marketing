@@ -143,6 +143,10 @@
       <div class="dot checking" id="xhsDot"></div>
       <span style="font-size:12px;color:#737373" id="xhsStatus">小红书...</span>
     </div>
+    <div class="status-item" style="border-left:1px solid #222;padding-left:16px;margin-left:4px">
+      <span style="font-size:11px;color:#525252">下次检查</span>
+      <span style="font-size:12px;color:#a3a3a3;font-variant-numeric:tabular-nums" id="nextCheckTime">—</span>
+    </div>
   </div>
 </div>
 
@@ -235,6 +239,13 @@ function openNote(id) {
         <input class="edit-input" id="edit-tags" value="${(note.tags||[]).join(', ')}">
       </div>
 
+      ${note.status === 'scheduled' ? `
+      <div class="edit-field">
+        <div class="edit-label">📅 发布时间</div>
+        <input class="edit-input" id="edit-scheduled-at" type="datetime-local"
+          value="${note.scheduledAt ? new Date(note.scheduledAt).toISOString().slice(0,16) : ''}">
+      </div>` : ''}
+
       <div class="save-bar">
         <button class="btn-save" onclick="saveNote('${note.id}')">保存</button>
         <span class="save-msg" id="save-msg">✓ 已保存</span>
@@ -255,16 +266,21 @@ async function saveNote(id) {
   const title = $('#edit-title').value.trim();
   const content = $('#edit-content').value;
   const tags = $('#edit-tags').value.split(',').map(t => t.trim()).filter(Boolean);
+  const scheduledAtEl = $('#edit-scheduled-at');
+  const scheduledAt = scheduledAtEl ? scheduledAtEl.value : undefined;
 
   try {
     await fetch(`/api/notes/${id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, content, tags }),
+      body: JSON.stringify({ title, content, tags, ...(scheduledAt ? { scheduledAt } : {}) }),
     });
     // Update local cache
     const note = data.notes.find(n => n.id === id);
-    if (note) { note.title = title; note.content = content; note.tags = tags; }
+    if (note) {
+      note.title = title; note.content = content; note.tags = tags;
+      if (scheduledAt) note.scheduledAt = new Date(scheduledAt).toISOString();
+    }
     const msg = $('#save-msg');
     msg.style.display = 'inline';
     setTimeout(() => { msg.style.display = 'none'; }, 2000);
@@ -554,6 +570,28 @@ async function checkXhsLogin() {
 }
 checkXhsLogin();
 setInterval(checkXhsLogin, 15000);
+
+// Daemon 状态 — 显示下次检查倒计时
+let nextCheckTs = null;
+async function fetchDaemonStatus() {
+  try {
+    const s = await fetch('/api/daemon-status').then(r => r.json());
+    nextCheckTs = s.nextCheck || null;
+    updateNextCheckDisplay();
+  } catch { /* ignore */ }
+}
+function updateNextCheckDisplay() {
+  const el = $('#nextCheckTime');
+  if (!el) return;
+  if (!nextCheckTs) { el.textContent = '—'; return; }
+  const diff = Math.max(0, nextCheckTs - Date.now());
+  const mins = Math.floor(diff / 60000);
+  const secs = Math.floor((diff % 60000) / 1000);
+  el.textContent = diff <= 0 ? '马上' : `${mins}:${String(secs).padStart(2,'0')}`;
+}
+fetchDaemonStatus();
+setInterval(fetchDaemonStatus, 60000);   // 每分钟重新拉一次
+setInterval(updateNextCheckDisplay, 1000); // 每秒倒计时
 </script>
 </body>
 </html>

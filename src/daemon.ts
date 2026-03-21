@@ -16,7 +16,7 @@ import { callMcp } from "./publish";
 import { generateReport } from "./report";
 import { optimizeNote } from "./optimize";
 import { runDiscover } from "./discover";
-import { existsSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -25,6 +25,7 @@ const __dirname = dirname(__filename);
 const IMAGES_DIR = resolve(__dirname, "../images");
 
 const CHECK_INTERVAL_MS = 10 * 60 * 1000; // 每 10 分钟检查一次
+const STATUS_FILE = resolve(__dirname, "../.daemon-status.json");
 const COLLECT_AFTER_HOURS = [24, 72]; // 发布后多少小时采集
 
 function hoursSince(date: Date): number {
@@ -262,6 +263,17 @@ async function run() {
   await checkWeeklyReport();
   await checkAndDiscover();
 
+  function writeStatus() {
+    const now = Date.now();
+    writeFileSync(STATUS_FILE, JSON.stringify({
+      lastCheck: now,
+      nextCheck: now + CHECK_INTERVAL_MS,
+      intervalMs: CHECK_INTERVAL_MS,
+    }));
+  }
+
+  writeStatus();
+
   // 定时循环
   setInterval(async () => {
     try {
@@ -270,6 +282,7 @@ async function run() {
       await checkAndOptimize();
       await checkWeeklyReport();
       await checkAndDiscover();
+      writeStatus();
     } catch (err) {
       console.error(`[${new Date().toLocaleTimeString()}] Daemon error:`, err);
     }

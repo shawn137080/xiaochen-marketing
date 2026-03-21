@@ -5,6 +5,7 @@
  */
 import { createServer } from "node:http";
 import { readFileSync, existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { resolve, dirname, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { db } from "./db";
@@ -14,6 +15,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const PORT = 3100;
 const IMAGES_DIR = process.env.XHS_IMAGES_DIR || resolve(__dirname, "../images");
+const STATUS_FILE = resolve(__dirname, "../.daemon-status.json");
 
 // API handlers
 async function getNotesApi() {
@@ -126,6 +128,15 @@ const server = createServer(async (req, res) => {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ loggedIn: false, message: "检查失败" }));
       }
+    } else if (url.pathname === "/api/daemon-status") {
+      try {
+        const raw = await readFile(STATUS_FILE, "utf-8");
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(raw);
+      } catch {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ lastCheck: null, nextCheck: null, intervalMs: 10 * 60 * 1000 }));
+      }
     } else if (url.pathname === "/api/notes") {
       const data = await getNotesApi();
       res.writeHead(200, { "Content-Type": "application/json" });
@@ -216,7 +227,7 @@ const server = createServer(async (req, res) => {
       req.on("data", (c: Buffer) => chunks.push(c));
       await new Promise((r) => req.on("end", r));
       const body = JSON.parse(Buffer.concat(chunks).toString()) as {
-        title?: string; content?: string; tags?: string[];
+        title?: string; content?: string; tags?: string[]; scheduledAt?: string;
       };
       const updated = await db.xhsNote.update({
         where: { id },
@@ -224,6 +235,7 @@ const server = createServer(async (req, res) => {
           ...(body.title !== undefined && { title: body.title }),
           ...(body.content !== undefined && { content: body.content }),
           ...(body.tags !== undefined && { tags: JSON.stringify(body.tags) }),
+          ...(body.scheduledAt !== undefined && { scheduledAt: new Date(body.scheduledAt) }),
         },
       });
       res.writeHead(200, { "Content-Type": "application/json" });
