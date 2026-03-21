@@ -10,7 +10,7 @@ services:
       - "18060:18060"
     volumes:
       - mcp-cookies:/app/cookies    # 登录 cookies 持久化
-      - xhs-images:/app/images      # 图片共享目录
+      - xhs-images:/data/images     # 图片共享目录（与 tools 容器路径一致）
     environment:
       - ROD_BROWSER_BIN=/usr/bin/google-chrome
     command: ["./app", "-headless=true", "-port", ":18060"]
