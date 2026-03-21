@@ -11,9 +11,12 @@
   .header { padding: 24px 32px; border-bottom: 1px solid #1a1a1a; display: flex; align-items: center; gap: 16px; }
   .header h1 { font-size: 20px; font-weight: 600; }
   .header .subtitle { color: #737373; font-size: 13px; }
-  .header .status { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .header .status { margin-left: auto; display: flex; gap: 16px; align-items: center; }
   .header .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; }
   .header .dot.offline { background: #ef4444; }
+  .header .dot.checking { background: #f59e0b; animation: pulse 1s infinite; }
+  .status-item { display: flex; align-items: center; gap: 6px; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
 
   .tabs { display: flex; gap: 0; border-bottom: 1px solid #1a1a1a; padding: 0 32px; }
   .tab { padding: 12px 20px; cursor: pointer; color: #737373; font-size: 14px; border-bottom: 2px solid transparent; transition: all 0.2s; }
@@ -132,8 +135,14 @@
   <h1>🧠 小陈 Dashboard</h1>
   <span class="subtitle">AllDayAnswer 小红书营销系统</span>
   <div class="status">
-    <div class="dot" id="daemonDot"></div>
-    <span style="font-size:12px;color:#737373" id="daemonStatus">检查中...</span>
+    <div class="status-item">
+      <div class="dot checking" id="mcpDot"></div>
+      <span style="font-size:12px;color:#737373" id="mcpStatus">MCP...</span>
+    </div>
+    <div class="status-item">
+      <div class="dot checking" id="xhsDot"></div>
+      <span style="font-size:12px;color:#737373" id="xhsStatus">小红书...</span>
+    </div>
   </div>
 </div>
 
@@ -289,16 +298,14 @@ async function fetchAll() {
   ]);
   data = { notes, reports, optimizations, analytics };
 
-  // Check daemon
+  // Check MCP health (server-side proxy avoids CORS/localhost issues)
   try {
-    const res = await fetch('http://localhost:18060/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"dashboard","version":"1.0"}}}' });
-    if (res.ok) {
-      $('#daemonDot').className = 'dot';
-      $('#daemonStatus').textContent = 'MCP 在线';
-    }
+    const mh = await fetch('/api/mcp-health').then(r => r.json());
+    $('#mcpDot').className = mh.ok ? 'dot' : 'dot offline';
+    $('#mcpStatus').textContent = mh.ok ? 'MCP 在线' : 'MCP 离线';
   } catch {
-    $('#daemonDot').className = 'dot offline';
-    $('#daemonStatus').textContent = 'MCP 离线';
+    $('#mcpDot').className = 'dot offline';
+    $('#mcpStatus').textContent = 'MCP 离线';
   }
 
   render();
@@ -533,6 +540,20 @@ fetchAll();
 loadDraftBadge();
 setInterval(fetchAll, 30000);
 setInterval(loadDraftBadge, 5 * 60 * 1000);
+
+// XHS 登录状态检查 — 每 15 秒
+async function checkXhsLogin() {
+  try {
+    const r = await fetch('/api/login-status').then(r => r.json());
+    $('#xhsDot').className = r.loggedIn ? 'dot' : 'dot offline';
+    $('#xhsStatus').textContent = r.loggedIn ? '小红书 已登录' : '小红书 未登录';
+  } catch {
+    $('#xhsDot').className = 'dot offline';
+    $('#xhsStatus').textContent = '小红书 检查失败';
+  }
+}
+checkXhsLogin();
+setInterval(checkXhsLogin, 15000);
 </script>
 </body>
 </html>

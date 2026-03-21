@@ -8,6 +8,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve, dirname, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { db } from "./db";
+import { callMcp } from "./publish";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -100,7 +101,32 @@ const server = createServer(async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
 
   try {
-    if (url.pathname === "/api/notes") {
+    if (url.pathname === "/api/mcp-health") {
+      try {
+        const mcpUrl = process.env.XHS_MCP_URL || "http://localhost:18060/mcp";
+        const r = await fetch(mcpUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
+        });
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: r.ok }));
+      } catch {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: false }));
+      }
+    } else if (url.pathname === "/api/login-status") {
+      try {
+        const response = await callMcp("check_login_status", {});
+        const text = response.result?.content?.[0]?.text || "";
+        const loggedIn = !response.error && (text.includes("已登录") || text.includes("logged in") || text.toLowerCase().includes("true") || text.includes("登录成功"));
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ loggedIn, message: text }));
+      } catch {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ loggedIn: false, message: "检查失败" }));
+      }
+    } else if (url.pathname === "/api/notes") {
       const data = await getNotesApi();
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(data));
