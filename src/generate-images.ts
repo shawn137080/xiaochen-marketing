@@ -142,29 +142,40 @@ async function generateImagePromptWithSkill(
 
   const [hookLine1, hookLine2] = cfg.hookText.split("\n");
 
-  const systemPrompt = `你是小红书爆款图片设计师，专为加拿大华人小老板服务（品牌：兜兜AI）。
-你将根据笔记内容和设计技能指南，为 Gemini 图像生成模型写一个精准的中文 image prompt。
+  const systemPrompt = `You are a Xiaohongshu (Chinese social media) viral image designer for 兜兜AI, serving Chinese-Canadian small business owners.
+Write a Gemini image generation prompt IN ENGLISH. The image must contain specific Chinese text elements listed below.
 
-设计技能指南如下：
+Design style guide (for reference):
 ---
 ${skillGuide}
 ---
 
-⚠️ 硬性规则（不可违反）：
-1. 图中大字标题必须完全按照给定钩子文字输出，一字不差：「${hookLine1}」${hookLine2 ? `「${hookLine2}」` : ""}
-2. 品牌标识必须是「兜兜AI」，不能是其他品牌名称
-3. 风格必须是扁平漫画/线条插画，绝对禁止写实风格和真实照片
-4. 只输出一段 Gemini image prompt，不要有任何解释或前缀`;
+HARD RULES (never violate):
+1. The prompt must be written IN ENGLISH
+2. The Chinese text elements must appear VERBATIM in the image as specified in the user message
+3. Brand name in the image must be exactly: 兜兜AI
+4. Art style: FLAT 2D cartoon / Korean webtoon style — round-head stick figures, bold outlines, simple shapes, NO realistic faces, NO photographs
+5. Output ONLY the prompt text, no explanations or prefixes`;
 
-  const userPrompt = `请为以下笔记生成配图 prompt：
+  const userPrompt = `Write an English Gemini image prompt for this Xiaohongshu post:
 
-标题：${note.title}
-行业：${note.industry ?? "通用"}
-内容风格：${note.contentAngle ?? cfg.template}
-钩子大字（必须原文出现在图中）：第一行「${hookLine1}」${hookLine2 ? `第二行「${hookLine2}」` : ""}
-${cfg.subText ? `副文字：${cfg.subText}` : ""}
-${cfg.bigNumber ? `核心数据（图中必须显示）：${cfg.bigNumber}（${cfg.bigLabel ?? ""}）` : ""}
-${cfg.dataSub1 ? `支撑数据：${cfg.dataSub1} ${cfg.dataSub2 ?? ""}` : ""}`;
+Note title: ${note.title}
+Industry: ${note.industry ?? "general"}
+Template type: ${note.contentAngle ?? cfg.template}
+
+REQUIRED Chinese text in the image (copy exactly):
+- Large headline text in TOP LEFT corner, bold coral red (#FF5C5C), two lines:
+  Line 1: ${hookLine1}
+  ${hookLine2 ? `Line 2: ${hookLine2}` : ""}
+- Small brand text at BOTTOM CENTER: 兜兜AI (dark gray, small)
+${cfg.subText ? `- Supporting subtitle text: ${cfg.subText}` : ""}
+${cfg.bigNumber ? `- Giant number in center of image: ${cfg.bigNumber}
+- Label below number: ${cfg.bigLabel ?? ""}` : ""}
+${cfg.dataSub1 ? `- Supporting stats: ${cfg.dataSub1} ${cfg.dataSub2 ?? ""}` : ""}
+
+Aspect ratio: ${cfg.template === "scene" || cfg.template === "before_after" ? "3:4" : "9:16"}
+Background: cream white #FFF9F0 (or dark near-black for data posters)
+NO watermarks, NO realistic faces, NO complex backgrounds, NO gradients`;
 
   try {
     const res = await fetch(`${LLM_BASE_URL}/chat/completions`, {
