@@ -140,6 +140,8 @@ async function generateImagePromptWithSkill(
 ): Promise<string | null> {
   if (!LLM_API_KEY) return null;
 
+  const [hookLine1, hookLine2] = cfg.hookText.split("\n");
+
   const systemPrompt = `你是小红书爆款图片设计师，专为加拿大华人小老板服务（品牌：兜兜AI）。
 你将根据笔记内容和设计技能指南，为 Gemini 图像生成模型写一个精准的中文 image prompt。
 
@@ -148,25 +150,21 @@ async function generateImagePromptWithSkill(
 ${skillGuide}
 ---
 
-输出要求：
-- 只输出一段 Gemini image prompt，不要有任何解释或前缀
-- prompt 用中文，直接描述图像
-- 必须包含笔记的核心文字钩子（要求图中渲染出来）
-- 文字位置：大标题放在左上角或画面居中，不要放在底部或角落
-- 品牌标识"兜兜AI"放左上角角标或底部居中，字体小巧不抢眼
-- 必须包含扁平插画元素：小红书爆款漫画风，卡通人物/表情包式线条小人，扁平简洁，无强透视
-- 字体风格：粗黑体/手写感，颜色用珊瑚红、奶油白或深灰，与小红书审美一致
-- 必须指定比例（9:16竖版 用于卡片类，3:4 用于人物场景类）
-- 加上负面词：无水印，无失真人脸，无复杂背景，无过度渐变`;
+⚠️ 硬性规则（不可违反）：
+1. 图中大字标题必须完全按照给定钩子文字输出，一字不差：「${hookLine1}」${hookLine2 ? `「${hookLine2}」` : ""}
+2. 品牌标识必须是「兜兜AI」，不能是其他品牌名称
+3. 风格必须是扁平漫画/线条插画，绝对禁止写实风格和真实照片
+4. 只输出一段 Gemini image prompt，不要有任何解释或前缀`;
 
   const userPrompt = `请为以下笔记生成配图 prompt：
 
 标题：${note.title}
 行业：${note.industry ?? "通用"}
 内容风格：${note.contentAngle ?? cfg.template}
-钩子文字：${cfg.hookText.replace("\n", " / ")}
-${cfg.subText ? `副标题：${cfg.subText}` : ""}
-${cfg.bigNumber ? `核心数据：${cfg.bigNumber}（${cfg.bigLabel ?? ""}）` : ""}`;
+钩子大字（必须原文出现在图中）：第一行「${hookLine1}」${hookLine2 ? `第二行「${hookLine2}」` : ""}
+${cfg.subText ? `副文字：${cfg.subText}` : ""}
+${cfg.bigNumber ? `核心数据（图中必须显示）：${cfg.bigNumber}（${cfg.bigLabel ?? ""}）` : ""}
+${cfg.dataSub1 ? `支撑数据：${cfg.dataSub1} ${cfg.dataSub2 ?? ""}` : ""}`;
 
   try {
     const res = await fetch(`${LLM_BASE_URL}/chat/completions`, {
