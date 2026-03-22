@@ -24,7 +24,7 @@ const LLM_MODEL = process.env.LLM_MODEL || "google/gemini-3-flash";
 
 // 加载技能指南（运行时读取，确保使用最新版本）
 function loadSkillGuide(): string {
-  const skillPath = resolve(__dirname, "../../skills/xhs-image-prompts/SKILL.md");
+  const skillPath = resolve(__dirname, "../skills/xhs-image-prompts/SKILL.md");
   try {
     return readFileSync(skillPath, "utf-8");
   } catch {
