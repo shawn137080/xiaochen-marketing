@@ -74,7 +74,7 @@ interface InsightRow {
 
 async function searchKeyword(keyword: string): Promise<InsightRow[]> {
   try {
-    const response = await callMcp("search_feeds", { keyword, limit: 10 });
+    const response = await callMcp("search_feeds", { keyword });
     if (response.error) {
       console.warn(`   ⚠️  搜索 "${keyword}" 失败: ${response.error.message}`);
       return [];
