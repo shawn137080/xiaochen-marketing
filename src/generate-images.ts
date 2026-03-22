@@ -52,26 +52,18 @@ const NOTE_CONFIGS: Record<string, NoteImageConfig> = {
     hookText: "做着项目\n电话又断了",
     subText: "你不知道那头是谁",
   },
-  "我统计了30天：消失的电话值多少钱": {
-    template: "data",
-    hookText: "消失的电话\n值多少钱",
-    bigNumber: "11个",
-    bigLabel: "潜在客户就这样消失了",
-    dataSub1: "每月漏接损失",
-    dataSub2: "$3,000 – $6,000",
-  },
   "华人小老板开店必装的3个AI工具": {
     template: "tool",
-    hookText: "华人老板必装\n3个AI工具",
-    subText: "① AI接电话  ② 自动预约  ③ 报价模板",
+    hookText: "华人老板必装\n3个智能工具",
+    subText: "① 自动接听  ② 自动预约  ③ 报价模板",
   },
   "补习班招生季，漏一个电话损失多少": {
     template: "data",
     hookText: "漏一个电话\n损失多少钱",
-    bigNumber: "$3,000",
-    bigLabel: "一个家长来电的价值",
-    dataSub1: "学生平均留存 8–10 个月",
-    dataSub2: "$150–300/月 × 10 = 你算",
+    bigNumber: "1个学生",
+    bigLabel: "一年的学费你算过吗",
+    dataSub1: "平均留存 8–10 个月",
+    dataSub2: "接到 = 留住",
   },
   "水管师傅开车途中，那个电话断了": {
     template: "scene",
@@ -83,8 +75,7 @@ const NOTE_CONFIGS: Record<string, NoteImageConfig> = {
     hookText: "实测90天\n成单数据来了",
     bigNumber: "+133%",
     bigLabel: "成单数提升",
-    dataSub1: "额外收入",
-    dataSub2: "$45,000 / 3个月",
+    dataSub1: "三个月，收入明显多了",
   },
   "美甲店零漏单的秘密：就这一个设置": {
     template: "tool",
@@ -93,7 +84,7 @@ const NOTE_CONFIGS: Record<string, NoteImageConfig> = {
   },
   "AI时代，不用AI的老板输在哪里": {
     template: "before_after",
-    hookText: "用AI和没用\n差距已经出来了",
+    hookText: "用了和没用\n差距已经出来了",
   },
   "割草旺季到了，一个人怎么接得过来": {
     template: "scene",
@@ -102,12 +93,12 @@ const NOTE_CONFIGS: Record<string, NoteImageConfig> = {
   },
   "搬家旺季：有AI接电话和没有的区别": {
     template: "before_after",
-    hookText: "旺季多接30%的单\n他就靠这一个变化",
+    hookText: "旺季多接好几个单\n他就靠这一个变化",
   },
   "来加拿大创业2年，我最后悔的一件事": {
     template: "text_card",
     hookText: "来加拿大创业 2 年\n最后悔的一件事",
-    subText: "不是选错行业，不是定价太低\n是没有早点让 AI 帮我接电话",
+    subText: "不是选错行业，不是定价太低\n是没早点用自动接听",
   },
   "空调季来了，暖通师傅你接得过来吗": {
     template: "scene",
