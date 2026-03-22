@@ -74,7 +74,11 @@ interface InsightRow {
 
 async function searchKeyword(keyword: string): Promise<InsightRow[]> {
   try {
-    const response = await callMcp("search_feeds", { keyword });
+    // 超时控制：search_feeds 有时会挂住，最多等 15 秒
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("search timeout")), 15000)
+    );
+    const response = await Promise.race([callMcp("search_feeds", { keyword }), timeoutPromise]);
     if (response.error) {
       console.warn(`   ⚠️  搜索 "${keyword}" 失败: ${response.error.message}`);
       return [];
@@ -370,14 +374,13 @@ export async function runDiscover() {
   console.log(`   关键词: ${keywords.join(" / ")}`);
   console.log(`   行业轮换: ${industryKeyword} (${cursor + 1}/${INDUSTRY_KEYWORDS.length})\n`);
 
-  // 2. 搜索竞品爆款
+  // 2. 搜索竞品爆款（无结果也继续，用爆款大脑直接生成）
   const insights = await collectInsights(keywords);
   if (insights.length === 0) {
-    console.log("   没有找到足够的竞品数据，跳过本次生成");
-    await db.$disconnect();
-    return;
+    console.log("   ℹ️  竞品数据为空，跳过竞品分析，直接用爆款大脑生成");
+  } else {
+    console.log(`\n   共收集 ${insights.length} 条有效爆款\n`);
   }
-  console.log(`\n   共收集 ${insights.length} 条有效爆款\n`);
 
   // 3. 加载上下文
   const agentContext = loadAgentContext();
