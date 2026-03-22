@@ -17,7 +17,8 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const GEMINI_MODEL = "gemini-3.1-flash-image-preview";
 const IMAGES_DIR = process.env.XHS_IMAGES_DIR || resolve(__dirname, "../images");
 
-// LLM 配置（用于生成 image prompt）
+// LLM 配置（用于生成 image prompt，默认关闭，太不稳定）
+const USE_LLM = process.env.USE_LLM === "true";
 const LLM_API_KEY = process.env.LLM_API_KEY || "";
 const LLM_BASE_URL = (process.env.LLM_BASE_URL || "https://aiberm.com/v1").replace(/\/$/, "");
 const LLM_MODEL = process.env.LLM_MODEL || "google/gemini-3-flash";
@@ -44,6 +45,7 @@ interface NoteImageConfig {
   bigLabel?: string;
   dataSub1?: string;
   dataSub2?: string;
+  listItems?: [string, string, string];  // tool 模板的3条清单内容
 }
 
 const NOTE_CONFIGS: Record<string, NoteImageConfig> = {
@@ -55,7 +57,8 @@ const NOTE_CONFIGS: Record<string, NoteImageConfig> = {
   "华人小老板开店必装的3个AI工具": {
     template: "tool",
     hookText: "华人老板必装\n3个智能工具",
-    subText: "① 自动接听  ② 自动预约  ③ 报价模板",
+    subText: "省时省力，客人说你专业",
+    listItems: ["自动接听：24小时不漏电话", "自动预约：客人秒收确认", "报价模板：统一标准不乱报"],
   },
   "补习班招生季，漏一个电话损失多少": {
     template: "data",
@@ -81,6 +84,7 @@ const NOTE_CONFIGS: Record<string, NoteImageConfig> = {
     template: "tool",
     hookText: "美甲店零漏单\n就这1步设置",
     subText: "5分钟搞定，客人说「你们好专业」",
+    listItems: ["开启自动接听，电话不再漏", "自动发确认消息给客人", "老板专心做项目，不分心"],
   },
   "AI时代，不用AI的老板输在哪里": {
     template: "before_after",
@@ -113,7 +117,8 @@ const NOTE_CONFIGS: Record<string, NoteImageConfig> = {
   "为什么同行接单比你快？就差这一步": {
     template: "tool",
     hookText: "同行接单\n为什么比你快",
-    subText: "就差这一步 →",
+    subText: "就差这一步",
+    listItems: ["他们的电话24小时有人接", "客人问价秒回，不用等", "你还在漏单，他们在接单"],
   },
 };
 
@@ -145,7 +150,7 @@ HARD RULES (never violate):
 1. The prompt must be written IN ENGLISH
 2. The Chinese text elements must appear VERBATIM in the image as specified in the user message
 3. Brand name in the image must be exactly: 兜兜AI
-4. Art style: FLAT 2D cartoon / Korean webtoon style — round-head stick figures, bold outlines, simple shapes, NO realistic faces, NO photographs
+4. Art style: Clean modern TYPOGRAPHY-FIRST graphic design poster — bold text as the hero element, simple geometric shapes or emoji as accents. NO cartoon characters, NO stick figures, NO illustrated people, NO LINE Friends style, NO webtoon style, NO cute characters
 5. Output ONLY the prompt text, no explanations or prefixes`;
 
   const userPrompt = `Write an English Gemini image prompt for this Xiaohongshu post:
@@ -166,7 +171,7 @@ ${cfg.dataSub1 ? `- Supporting stats: ${cfg.dataSub1} ${cfg.dataSub2 ?? ""}` : "
 
 Aspect ratio: ${cfg.template === "scene" || cfg.template === "before_after" ? "3:4" : "9:16"}
 Background: cream white #FFF9F0 (or dark near-black for data posters)
-NO watermarks, NO realistic faces, NO complex backgrounds, NO gradients`;
+Style: Clean graphic design poster, typography-first. NO cartoon characters, NO stick figures, NO illustrations, NO realistic photos, NO watermarks.`;
 
   try {
     const res = await fetch(`${LLM_BASE_URL}/chat/completions`, {
@@ -218,15 +223,110 @@ function getAspectRatio(template: Template): "3:4" | "9:16" {
   return template === "scene" || template === "before_after" ? "3:4" : "9:16";
 }
 
+// 硬编码模板 prompt（严格按 SKILL.md 结构，稳定可靠）
+function buildFallbackPrompt(cfg: NoteImageConfig): string {
+  const [h1, h2 = ""] = cfg.hookText.split("\n");
+
+  switch (cfg.template) {
+    case "data":
+      return `Clean data poster for Chinese social media, 9:16 portrait format. Dark near-black background #1a1a2e.
+
+TOP-LEFT area: Two lines of white bold Chinese headline text:
+Line 1: "${h1}"
+Line 2: "${h2}"
+
+CENTER of image: Giant coral red #FF5C5C bold number "${cfg.bigNumber ?? ""}" — enormous, taking up 30% of the image height.
+
+BELOW THE NUMBER: White medium Chinese text "${cfg.bigLabel ?? ""}"
+
+BELOW THAT: Smaller light gray Chinese text "${cfg.dataSub1 ?? ""}"
+
+DECORATIVE: One thin horizontal coral red line above the giant number. Three small coral red circular dots in corners.
+
+VERY BOTTOM CENTER: Tiny gray text "兜兜AI"
+
+Style: Minimal dark-mode data poster, bold clean typography, NO cartoon characters, NO illustrations, NO watermarks, professional graphic design.`;
+
+    case "tool": {
+      const items = cfg.listItems ?? ["自动接听，24小时不漏单", "即时回复，客户秒感受到", "轻松管理，老板不分心"];
+      return `Clean informational card for Chinese social media, 9:16 portrait format. Soft cream white background #FFF9F0.
+
+TOP of image: A bold coral red stripe (full width, ~8% height) at very top.
+
+UPPER CENTER: Large bold coral red #FF5C5C Chinese headline text:
+"${h1}"
+"${h2}"
+Below headline: smaller dark gray Chinese text "${cfg.subText ?? ""}"
+
+MIDDLE: A clean white rounded rectangle card with subtle drop shadow. Inside the card, exactly three list items with coral red circle number bullets, in dark gray Chinese text:
+① ${items[0]}
+② ${items[1]}
+③ ${items[2]}
+
+VERY BOTTOM CENTER: Tiny dark gray text "兜兜AI"
+
+Style: Clean graphic design card, professional, NO cartoon characters, NO illustrations, NO watermarks. Modern Chinese brand style.`;
+    }
+
+    case "before_after":
+      return `Clean split-panel comparison poster for Chinese social media, 3:4 portrait format.
+
+TOP HALF (~45%): Dark gray #2d2d2d background. Small white label "❌ 以前" top-left. Large white Chinese text: "电话漏接，客户流失"
+
+DIVIDING STRIPE (~10%): Bold coral red horizontal band. White bold Chinese headline centered: "${h1} ${h2}"
+
+BOTTOM HALF (~45%): Warm cream #FFF9F0 background. Small coral red label "✅ 现在" left side. Large dark gray Chinese text: "每个电话都有人接，订单稳稳的"
+
+VERY BOTTOM CENTER: Tiny dark gray text "兜兜AI"
+
+Style: Bold graphic design split layout, clean typography, NO cartoon characters, NO illustrations, NO watermarks.`;
+
+    case "text_card": {
+      const bodyText = cfg.subText ?? "生意做好，从接好每个电话开始";
+      return `Minimalist quote card for Chinese social media, 9:16 portrait format. Warm cream white background #FFF9F0 with very subtle paper texture.
+
+TOP-LEFT: Very large decorative quotation mark " in coral red #FF5C5C, positioned prominently.
+
+UPPER CENTER: Very large bold dark gray #1a1a1a Chinese text: "${h1}"
+Below it in coral red bold: "${h2}"
+
+A thin coral red horizontal line separator below the headline.
+
+CENTER: Medium dark gray Chinese body text, centered, displayed as a single text block (do NOT repeat any line):
+"${bodyText}"
+
+BOTTOM: Small rounded coral red badge with white text "兜兜AI" centered inside.
+
+Style: Clean typography-only design, warm and editorial, NO cartoon characters, NO illustrations, NO watermarks. Each text element appears exactly once.`;
+    }
+
+    case "scene":
+    default:
+      return `Clean modern Chinese social media poster, 3:4 portrait format. Warm cream white background #FFF9F0.
+
+TOP-LEFT area: Two lines of large bold Chinese headline text, coral red #FF5C5C, thick font weight:
+Line 1: "${h1}"
+Line 2: "${h2}"
+
+CENTER of image: One large simple emoji relevant to the topic — displayed very large (about 150px), clean, just the emoji itself. Choose from: 📱🔧✂️🌿❄️🏠 based on context.
+
+BOTTOM area: A coral red full-width horizontal band containing small white Chinese text "${cfg.subText ?? ""}" centered inside it.
+
+VERY BOTTOM CENTER: Tiny dark gray text "兜兜AI"
+
+Style: Clean graphic design poster, typography-first, NO cartoon characters, NO illustrations, NO complex backgrounds, NO watermarks. Bold clean fonts. Minimal and professional.`;
+  }
+}
+
 // ── 主流程 ────────────────────────────────────────────────────────────────
 async function main() {
   if (!GEMINI_API_KEY) { console.error("GEMINI_API_KEY is required"); process.exit(1); }
 
   const skillGuide = loadSkillGuide();
-  const useSkill = !!skillGuide && !!LLM_API_KEY;
+  const useSkill = USE_LLM && !!skillGuide && !!LLM_API_KEY;
   console.log(useSkill
     ? "🧠 技能模式：LLM 读取 SKILL.md → 生成 prompt → Gemini 生图\n"
-    : "⚙️  标准模式：使用内置 prompt（未配置 LLM_API_KEY 或找不到技能文件）\n"
+    : "⚡ 直接模式：硬编码模板 prompt → Gemini 生图（更稳定可靠）\n"
   );
 
   const allNotes = await db.xhsNote.findMany({
@@ -260,17 +360,10 @@ async function main() {
       }
     }
 
-    // Step 2: 生成图片（用 LLM prompt 或内置 fallback）
+    // Step 2: 生成图片（用 LLM prompt 或硬编码模板）
     if (!imagePrompt) {
-      // 内置 fallback prompt（精简版）
-      const [h1, h2] = cfg.hookText.split("\n");
-      imagePrompt = cfg.template === "data"
-        ? `设计小红书竖版9:16数据海报，深色背景，核心数字"${cfg.bigNumber ?? ""}"超大珊瑚红字体居中，左上角白色粗黑体标题"${h1} ${h2}"，中部说明"${cfg.bigLabel ?? ""}"，支撑数据"${cfg.dataSub1 ?? ""} ${cfg.dataSub2 ?? ""}"，右侧点缀扁平卡通小人表情包元素，底部居中小字"兜兜AI"。简洁专业。无水印。`
-        : cfg.template === "tool"
-        ? `创作扁平漫画风格信息图卡片，比例9:16竖版，奶油米白背景，左上角珊瑚红粗黑体大标题"${h1} ${h2}"，副标题"${cfg.subText ?? ""}"，画面穿插小红书爆款扁平线条小人插画（手机/电话场景），底部居中小字"兜兜AI"。无水印，无失真人脸。`
-        : cfg.template === "text_card"
-        ? `设计小红书竖版9:16文字卡，暖奶油色背景，左上角大标题"${h1}"深灰色粗黑体、"${h2}"珊瑚红色，中部副文字"${cfg.subText ?? ""}"，点缀简单扁平卡通表情或线条插画，底部居中小字"兜兜AI"。无水印。`
-        : `扁平漫画插画风格，3:4竖版，加拿大华人小老板工作场景（行业：${note.industry ?? "通用"}），卡通线条人物漏接电话的情绪动作，左上角白色/珊瑚红粗黑体大字"${h1} ${h2}"，底部居中小字"兜兜AI"。无水印，无失真人脸，扁平简洁背景。`;
+      imagePrompt = buildFallbackPrompt(cfg);
+      console.log(`   📝 模板 prompt (${imagePrompt.length} chars)`);
     }
 
     try {
