@@ -1,0 +1,29 @@
+{
+  "_说明": "引擎配置。账号定位、对标账号、关键词在 vault/00-定位/账号定位.md 里改，不在这里。",
+  "vaultDir": "vault",
+  "apify": {
+    "tokenEnv": "APIFY_TOKEN",
+    "_说明": "actor 和输入字段需要实测后确认；{{userId}} {{keyword}} {{limit}} 会被替换。换 actor 只改这里。",
+    "userProfile": {
+      "actor": "vulnv/xiaohongshu-scraper",
+      "input": { "operation": "user_profile", "user_id": "{{userId}}" }
+    },
+    "userNotes": {
+      "actor": "vulnv/xiaohongshu-scraper",
+      "input": { "operation": "user_notes", "user_id": "{{userId}}", "max_items": "{{limit}}" }
+    },
+    "search": {
+      "actor": "vulnv/xiaohongshu-scraper",
+      "input": { "operation": "search_notes", "keyword": "{{keyword}}", "max_items": "{{limit}}", "sort": "popularity_descending" }
+    },
+    "comments": {
+      "actor": "vulnv/xiaohongshu-scraper",
+      "input": { "operation": "note_comments", "note_url": "{{noteUrl}}", "max_items": "{{limit}}" }
+    }
+  },
+  "sync": {
+    "notesPerAccount": 30,
+    "searchLimit": 30
+  },
+  "scoring": {}
+}
